@@ -1,4 +1,12 @@
+use std::{
+    error::Error,
+    fs::{File, write},
+    io::BufReader,
+};
+
 use ndarray::prelude::*;
+use ron::ser::PrettyConfig;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy)]
 enum Direction {
@@ -8,27 +16,39 @@ enum Direction {
     Right,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Default)]
 enum Tile {
+    #[default]
     Empty,
     Blocker,
     Regular(u32), // color
 }
 
+#[derive(Serialize, Deserialize)]
 struct Grid {
-    width: usize,
-    length: usize,
+    #[serde(skip)]
     data: Array2<Tile>,
-    // data[x * length + width]. Upper left is [0, 0].
+}
+
+#[derive(Serialize, Deserialize)]
+struct VecGrid {
+    dim: [usize; 2],
+    pattern: Vec<Vec<Tile>>,
 }
 
 impl Grid {
     fn new(width: usize, length: usize) -> Self {
         Self {
-            width,
-            length,
             data: Array2::from_elem((width, length), Tile::Empty),
         }
+    }
+
+    fn get_width(&self) -> usize {
+        self.data.dim().0
+    }
+
+    fn get_length(&self) -> usize {
+        self.data.dim().1
     }
 
     fn get(&self, x: usize, y: usize) -> Option<&Tile> {
@@ -54,29 +74,29 @@ impl Grid {
     fn move_grid(&mut self, direction: Direction) {
         match direction {
             Direction::Left => {
-                for x in 0..self.width {
-                    for y in 0..self.length {
+                for x in 0..self.get_width() {
+                    for y in 0..self.get_length() {
                         self.move_tile(x, y, direction);
                     }
                 }
             }
             Direction::Right => {
-                for x in (0..self.width).rev() {
-                    for y in 0..self.length {
+                for x in (0..self.get_width()).rev() {
+                    for y in 0..self.get_length() {
                         self.move_tile(x, y, direction);
                     }
                 }
             }
             Direction::Up => {
-                for y in 0..self.length {
-                    for x in 0..self.width {
+                for y in 0..self.get_length() {
+                    for x in 0..self.get_width() {
                         self.move_tile(x, y, direction);
                     }
                 }
             }
             Direction::Down => {
-                for y in (0..self.length).rev() {
-                    for x in 0..self.width {
+                for y in (0..self.get_length()).rev() {
+                    for x in 0..self.get_width() {
                         self.move_tile(x, y, direction);
                     }
                 }
@@ -104,15 +124,41 @@ impl Grid {
             self.data.swap((x, y), (tx, ty));
         }
     }
+
+    fn to_vec(&self) -> VecGrid {
+        VecGrid {
+            dim: [self.get_width(), self.get_length()],
+            pattern: self
+                .data
+                .columns()
+                .into_iter()
+                .map(|row| row.iter().copied().collect())
+                .collect(),
+        }
+    }
+
+    fn from_vec(format: VecGrid) -> Result<Self, Box<dyn Error>> {
+        let vec: Vec<Tile> = format.pattern.into_iter().flatten().collect();
+        let data = Array2::from_shape_vec((format.dim[0], format.dim[1]), vec)?;
+        Ok(Self { data })
+    }
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let mut grid = Grid::new(3, 3);
     grid.set(2, 0, Tile::Regular(0));
     grid.set(2, 1, Tile::Regular(1));
+    // let file = File::open("grid.json")?;
+    // let reader = BufReader::new(file);
+    // let vec: VecGrid = serde_json::from_reader(reader)?;
+    // let mut grid = Grid::from_vec(vec)?;
 
-    grid.move_grid(Direction::Down);
-    println!("{:?}", grid.get(2, 0).unwrap());
-    println!("{:?}", grid.get(2, 1).unwrap());
-    println!("{:?}", grid.get(2, 2).unwrap());
+    grid.move_grid(Direction::Left);
+
+    let pretty_config = PrettyConfig::new().depth_limit(2);
+    let ron = ron::ser::to_string_pretty(&grid.to_vec(), pretty_config)?;
+    println!("{}", ron);
+    write("grid.ron", ron)?;
+
+    Ok(())
 }

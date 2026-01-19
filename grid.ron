@@ -1,0 +1,8 @@
+(
+    dim: (3, 3),
+    pattern: [
+        [Empty, Regular(0), Empty],
+        [Empty, Regular(1), Empty],
+        [Empty, Empty, Empty],
+    ],
+)
