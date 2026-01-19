@@ -1,8 +1,9 @@
 (
-    dim: (3, 3),
+    length: 3,
+    width: 4,
     pattern: [
-        [Empty, Regular(0), Empty],
-        [Empty, Regular(1), Empty],
-        [Empty, Empty, Empty],
+        [Empty, Empty, Empty, Empty],
+        [Empty, Empty, Empty, Empty],
+        [Regular(0), Regular(1), Empty, Empty],
     ],
 )
