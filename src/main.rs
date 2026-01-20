@@ -22,7 +22,7 @@ use crate::objects::{Direction, Grid};
 fn main() -> Result<(), Box<dyn Error>> {
     // Import save file
     let save_file = read_to_string("grid.ron")?;
-    let mut grid = Grid::from_ron(save_file.as_str())?;
+    let grid = Grid::from_ron(save_file.as_str())?;
 
     let grid = ratatui::run(|terminal| {
         let mut app = App::from_grid(grid);
@@ -105,7 +105,14 @@ impl Widget for &App {
             .title(title.centered())
             .border_set(border::THICK);
 
-        let text = Text::from(vec![Line::from(vec!["Hi".into()])]);
+        let text = Text::from(
+            self.grid
+                .to_vec()
+                .pattern
+                .iter()
+                .map(|row| Line::from_iter(row))
+                .collect::<Vec<_>>(),
+        );
 
         Paragraph::new(text)
             .centered()

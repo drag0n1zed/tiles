@@ -4,6 +4,6 @@
     pattern: [
         [Empty, Empty, Empty, Empty],
         [Empty, Empty, Empty, Empty],
-        [Regular(0), Regular(1), Empty, Empty],
+        [Empty, Empty, Regular(0), Regular(1)],
     ],
 )

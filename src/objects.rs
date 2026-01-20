@@ -1,6 +1,10 @@
-use std::error::Error;
+use std::{error::Error, fmt};
 
 use ndarray::prelude::*;
+use ratatui::{
+    style::{Color, Style},
+    text::Span,
+};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +21,22 @@ pub enum Tile {
     #[default]
     Empty,
     Blocker,
-    Regular(u32), // color
+    Regular(u8), // color
+}
+
+impl From<&Tile> for Span<'static> {
+    fn from(tile: &Tile) -> Self {
+        match tile {
+            Tile::Empty => Span::styled("[ ]", Style::default().fg(Color::White)),
+            Tile::Blocker => Span::styled("[x]", Style::default().fg(Color::Black).bold()),
+            Tile::Regular(color) => Span::styled(
+                "[x]",
+                Style::default()
+                    .fg(Color::Indexed(color.clone()))
+                    .underlined(),
+            ),
+        }
+    }
 }
 
 pub struct Grid {
@@ -28,7 +47,7 @@ pub struct Grid {
 pub struct VecGrid {
     length: usize,
     width: usize,
-    pattern: Vec<Vec<Tile>>,
+    pub pattern: Vec<Vec<Tile>>,
 }
 
 impl Grid {
