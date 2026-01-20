@@ -1,9 +1,11 @@
 (
-    length: 3,
-    width: 4,
+    length: 5,
+    width: 5,
     pattern: [
-        [Empty, Empty, Empty, Empty],
-        [Empty, Empty, Empty, Empty],
-        [Empty, Empty, Regular(0), Regular(1)],
+        [Empty, Regular(202), Regular(1), Regular(1), Regular(202)],
+        [Regular(1), Empty, Regular(1), Blocker, Regular(202)],
+        [Regular(4), Regular(3), Regular(202), Empty, Empty],
+        [Empty, Empty, Blocker, Regular(3), Regular(3)],
+        [Regular(4), Regular(4), Regular(4), Regular(3), Blocker],
     ],
 )

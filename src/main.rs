@@ -14,7 +14,7 @@ use ratatui::{
     style::Stylize,
     symbols::border,
     text::{Line, Text},
-    widgets::{Block, Paragraph, Widget},
+    widgets::{Block, Padding, Paragraph, Widget},
 };
 
 use crate::objects::{Direction, Grid};
@@ -32,9 +32,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     })?;
 
     // Export save file
-    let save_file = grid.to_ron();
-    println!("{}", save_file);
-    write("grid.ron", save_file)?;
+    // let save_file = grid.to_ron();
+    // println!("{}", save_file);
+    // write("grid.ron", save_file)?;
 
     Ok(())
 }
@@ -98,12 +98,20 @@ impl App {
 }
 
 impl Widget for &App {
-    fn render(self, area: Rect, buf: &mut Buffer) {
+    fn render(self, rect: Rect, buf: &mut Buffer) {
         let title = Line::from(" TILES ".bold());
+
+        let padding = Padding::new(
+            0,
+            0,
+            (rect.height - self.grid.get_length() as u16 - 1) / 2,
+            0,
+        );
 
         let block = Block::bordered()
             .title(title.centered())
-            .border_set(border::THICK);
+            .border_set(border::THICK)
+            .padding(padding);
 
         let text = Text::from(
             self.grid
@@ -114,9 +122,9 @@ impl Widget for &App {
                 .collect::<Vec<_>>(),
         );
 
-        Paragraph::new(text)
+        Paragraph::new(text.centered())
             .centered()
             .block(block)
-            .render(area, buf);
+            .render(rect, buf);
     }
 }
