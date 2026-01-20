@@ -109,7 +109,7 @@ impl Widget for &App {
         );
 
         let block = Block::bordered()
-            .title(title.centered())
+            .title(title)
             .border_set(border::THICK)
             .padding(padding);
 
@@ -122,7 +122,7 @@ impl Widget for &App {
                 .collect::<Vec<_>>(),
         );
 
-        Paragraph::new(text.centered())
+        Paragraph::new(text)
             .centered()
             .block(block)
             .render(rect, buf);
