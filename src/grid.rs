@@ -1,12 +1,11 @@
-use std::{error::Error, fmt};
+use std::error::Error;
 
 use ndarray::prelude::*;
-use ratatui::{
-    style::{Color, Style},
-    text::Span,
-};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
+use union_find::{QuickUnionUf, UnionBySize, UnionFind};
+
+use crate::tile::Tile;
 
 #[derive(Clone, Copy)]
 pub enum Direction {
@@ -16,35 +15,43 @@ pub enum Direction {
     Right,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Default)]
-pub enum Tile {
-    #[default]
-    Empty,
-    Blocker,
-    Regular(u8), // color
-}
-
-impl From<&Tile> for Span<'static> {
-    fn from(tile: &Tile) -> Self {
-        match tile {
-            Tile::Empty => Span::styled("[ ]", Style::default().fg(Color::White)),
-            Tile::Blocker => Span::styled("[#]", Style::default().fg(Color::Black).bold()),
-            Tile::Regular(color) => {
-                Span::styled("[x]", Style::default().fg(Color::Indexed(color.clone())))
-            }
-        }
-    }
-}
-
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(into = "VecGrid", from = "VecGrid")]
 pub struct Grid {
     data: Array2<Tile>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct VecGrid {
+struct VecGrid {
     length: usize,
     width: usize,
-    pub pattern: Vec<Vec<Tile>>,
+    pattern: Vec<Vec<Tile>>,
+}
+
+impl From<Grid> for VecGrid {
+    fn from(grid: Grid) -> Self {
+        let pattern = grid
+            .get_array()
+            .rows()
+            .into_iter()
+            .map(|chunk| chunk.to_vec())
+            .collect();
+
+        VecGrid {
+            width: grid.get_width(),
+            length: grid.get_length(),
+            pattern,
+        }
+    }
+}
+
+impl From<VecGrid> for Grid {
+    fn from(vec_grid: VecGrid) -> Self {
+        let vec_flat: Vec<Tile> = vec_grid.pattern.into_iter().flatten().collect();
+        let data =
+            Array2::from_shape_vec((vec_grid.length, vec_grid.width), vec_flat).unwrap_or_default();
+        Grid { data }
+    }
 }
 
 impl Grid {
@@ -80,12 +87,6 @@ impl Grid {
         }
     }
 
-    // Iterate order: iterate through every column from top to bottom, from left to right
-    // [0, 0] ... [0, l - 1],
-    // [1, 0] ... [1, l - 1],
-    // [2, 0] ... [2, l - 1],
-    // ...
-    // [w - 1, 0] ... [w - 1, l - 1],
     pub fn move_grid(&mut self, direction: Direction) {
         match direction {
             Direction::Left => {
@@ -117,6 +118,8 @@ impl Grid {
                 }
             }
         };
+
+        self.clear_connected_tiles();
     }
 
     fn move_tile(&mut self, y: usize, x: usize, direction: Direction) {
@@ -140,32 +143,44 @@ impl Grid {
         }
     }
 
-    pub fn to_vec(&self) -> VecGrid {
-        VecGrid {
-            length: self.get_length(),
-            width: self.get_width(),
-            pattern: self
-                .data
-                .rows()
-                .into_iter()
-                .map(|row| row.iter().copied().collect())
-                .collect(),
+    fn clear_connected_tiles(&mut self) {
+        let (length, width) = (self.get_length(), self.get_width());
+        let mut uf = QuickUnionUf::<UnionBySize>::new(length * width);
+        for ((y, x), tile) in self.data.indexed_iter() {
+            let Tile::Regular(color) = tile else { continue };
+            let index = y * width + x;
+
+            if x + 1 < width {
+                if let Tile::Regular(right_color) = self.data.get((y, x + 1)).unwrap() {
+                    if color == right_color {
+                        uf.union(index, index + 1);
+                    }
+                }
+            }
+            if y + 1 < length {
+                if let Tile::Regular(bottom_color) = self.data.get((y + 1, x)).unwrap() {
+                    if color == bottom_color {
+                        uf.union(index, index + width);
+                    }
+                }
+            }
+        }
+
+        for ((y, x), tile) in self.data.indexed_iter_mut() {
+            let index = y * width + x;
+            let root_index = uf.find(index);
+            if uf.get(root_index).size() >= 4 {
+                *tile = Tile::Empty;
+            }
         }
     }
 
     pub fn to_ron(&self) -> String {
         let pretty_config = PrettyConfig::new().depth_limit(2);
-        ron::ser::to_string_pretty(&self.to_vec(), pretty_config).unwrap()
-    }
-
-    pub fn from_vec(vec_grid: VecGrid) -> Result<Self, Box<dyn Error>> {
-        let vec_flat: Vec<Tile> = vec_grid.pattern.into_iter().flatten().collect();
-        let data = Array2::from_shape_vec((vec_grid.length, vec_grid.width), vec_flat)?;
-        Ok(Self { data })
+        ron::ser::to_string_pretty(&self, pretty_config).unwrap()
     }
 
     pub fn from_ron(ron: &str) -> Result<Self, Box<dyn Error>> {
-        let vec: VecGrid = ron::de::from_str(ron)?;
-        Grid::from_vec(vec)
+        Ok(ron::de::from_str(ron)?)
     }
 }

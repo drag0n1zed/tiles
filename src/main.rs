@@ -1,4 +1,5 @@
-mod objects;
+mod grid;
+mod tile;
 
 use std::{
     error::Error,
@@ -6,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
@@ -17,7 +18,7 @@ use ratatui::{
     widgets::{Block, Padding, Paragraph, Widget},
 };
 
-use crate::objects::{Direction, Grid};
+use crate::grid::{Direction, Grid};
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Import save file
@@ -32,15 +33,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     })?;
 
     // Export save file
-    // let save_file = grid.to_ron();
-    // println!("{}", save_file);
-    // write("grid.ron", save_file)?;
+    write("grid.ron", grid.to_ron())?;
 
     Ok(())
 }
 
 struct App {
     grid: Grid,
+
+    dirty: bool,
+    grid_cache: Text<'static>,
+
     exit: bool,
 }
 
@@ -48,12 +51,23 @@ impl App {
     fn new(width: usize, length: usize) -> Self {
         Self {
             grid: Grid::new(width, length),
+
+            dirty: true,
+            grid_cache: Text::default(),
+
             exit: false,
         }
     }
 
     fn from_grid(grid: Grid) -> Self {
-        Self { grid, exit: false }
+        Self {
+            grid,
+
+            dirty: true,
+            grid_cache: Text::default(),
+
+            exit: false,
+        }
     }
 
     fn into_grid(self) -> Grid {
@@ -86,12 +100,13 @@ impl App {
     }
 
     fn handle_key_press(&mut self, key: event::KeyEvent) {
-        match key.code {
-            KeyCode::Left => self.grid.move_grid(Direction::Left),
-            KeyCode::Right => self.grid.move_grid(Direction::Right),
-            KeyCode::Up => self.grid.move_grid(Direction::Up),
-            KeyCode::Down => self.grid.move_grid(Direction::Down),
-            KeyCode::Esc => self.exit = true,
+        self.dirty = true;
+        match (key.code, key.modifiers) {
+            (KeyCode::Left, _) => self.grid.move_grid(Direction::Left),
+            (KeyCode::Right, _) => self.grid.move_grid(Direction::Right),
+            (KeyCode::Up, _) => self.grid.move_grid(Direction::Up),
+            (KeyCode::Down, _) => self.grid.move_grid(Direction::Down),
+            (KeyCode::Esc, _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => self.exit = true,
             _ => {}
         }
     }
@@ -99,7 +114,9 @@ impl App {
 
 impl Widget for &App {
     fn render(self, rect: Rect, buf: &mut Buffer) {
-        let title = Line::from(" TILES ".bold());
+        let header = Line::from(" TILES ".bold());
+
+        let footer = Line::from(" STEPS LEFT: to be implemented ").centered();
 
         let padding = Padding::new(
             0,
@@ -109,18 +126,22 @@ impl Widget for &App {
         );
 
         let block = Block::bordered()
-            .title(title)
+            .title(header)
             .border_set(border::THICK)
-            .padding(padding);
+            .padding(padding)
+            .title_bottom(footer);
 
-        let text = Text::from(
-            self.grid
-                .to_vec()
-                .pattern
-                .iter()
-                .map(|row| Line::from_iter(row))
-                .collect::<Vec<_>>(),
-        );
+        let text: Text<'_> = if self.dirty {
+            Text::from_iter(
+                self.grid
+                    .get_array()
+                    .rows()
+                    .into_iter()
+                    .map(|row| Line::from_iter(row)),
+            )
+        } else {
+            self.grid_cache.clone()
+        };
 
         Paragraph::new(text)
             .centered()
