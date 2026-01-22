@@ -3,18 +3,20 @@
 > [!NOTE]
 > Inspired by *Color Tiles*.
 
+![showcase](assets/showcase.png)
+
 TODO:
 - Game
-  - [ ] 4+ connected tiles disappear
+  - [x] 4+ connected tiles disappear
     - [ ] Disappear animation
   - [ ] Integrated solver
   - [ ] Steps before game over
   - [ ] Levels?
 
 - TUI
-  - [ ] Display the grid
-    - [ ] Tile color
-    - [ ] Tile textures
+  - [x] Display the grid
+    - [x] Tile color
+    - [x] Tile textures
     - [ ] Move animation
   - [ ] Import / export save in TUI
     - [ ] Choose save in command line

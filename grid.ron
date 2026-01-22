@@ -1,11 +1,11 @@
 (
-    length: 5,
+    height: 5,
     width: 5,
     pattern: [
-        [Empty, Regular(202), Regular(1), Regular(1), Regular(202)],
-        [Regular(1), Empty, Regular(1), Blocker, Regular(202)],
-        [Regular(4), Regular(3), Regular(202), Empty, Empty],
-        [Empty, Empty, Blocker, Regular(3), Regular(3)],
-        [Regular(4), Regular(4), Regular(4), Regular(3), Blocker],
+        [Empty, Regular("Green"), Regular("Red"), Regular("Red"), Regular("Green")],
+        [Regular("Red"), Empty, Regular("Red"), Blocker, Regular("Green")],
+        [Regular("Blue"), Regular("Yellow"), Regular("Green"), Empty, Empty],
+        [Empty, Empty, Blocker, Regular("Yellow"), Regular("Yellow")],
+        [Regular("Blue"), Regular("Blue"), Regular("Blue"), Regular("Yellow"), Blocker],
     ],
 )

@@ -14,16 +14,15 @@ use ratatui::{
     layout::Rect,
     style::Stylize,
     symbols::border,
-    text::{Line, Text},
-    widgets::{Block, Padding, Paragraph, Widget},
+    text::Line,
+    widgets::{Block, Widget},
 };
 
-use crate::grid::{Direction, Grid};
+use crate::grid::{Grid, TileMoveDirection};
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Import save file
-    let save_file = read_to_string("grid.ron")?;
-    let grid = Grid::from_ron(save_file.as_str())?;
+    let grid = Grid::from_ron(read_to_string("grid.ron")?.as_str())?;
 
     let grid = ratatui::run(|terminal| {
         let mut app = App::from_grid(grid);
@@ -41,33 +40,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 struct App {
     grid: Grid,
 
-    dirty: bool,
-    grid_cache: Text<'static>,
-
     exit: bool,
 }
 
 impl App {
-    fn new(width: usize, length: usize) -> Self {
-        Self {
-            grid: Grid::new(width, length),
-
-            dirty: true,
-            grid_cache: Text::default(),
-
-            exit: false,
-        }
-    }
-
     fn from_grid(grid: Grid) -> Self {
-        Self {
-            grid,
-
-            dirty: true,
-            grid_cache: Text::default(),
-
-            exit: false,
-        }
+        Self { grid, exit: false }
     }
 
     fn into_grid(self) -> Grid {
@@ -75,7 +53,7 @@ impl App {
     }
 
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<(), Box<dyn Error>> {
-        let tick_rate = Duration::from_millis(100);
+        let tick_rate = Duration::from_millis(16);
         let mut last_tick = Instant::now();
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
@@ -100,12 +78,11 @@ impl App {
     }
 
     fn handle_key_press(&mut self, key: event::KeyEvent) {
-        self.dirty = true;
         match (key.code, key.modifiers) {
-            (KeyCode::Left, _) => self.grid.move_grid(Direction::Left),
-            (KeyCode::Right, _) => self.grid.move_grid(Direction::Right),
-            (KeyCode::Up, _) => self.grid.move_grid(Direction::Up),
-            (KeyCode::Down, _) => self.grid.move_grid(Direction::Down),
+            (KeyCode::Left, _) => self.grid.move_grid(TileMoveDirection::Left),
+            (KeyCode::Right, _) => self.grid.move_grid(TileMoveDirection::Right),
+            (KeyCode::Up, _) => self.grid.move_grid(TileMoveDirection::Up),
+            (KeyCode::Down, _) => self.grid.move_grid(TileMoveDirection::Down),
             (KeyCode::Esc, _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => self.exit = true,
             _ => {}
         }
@@ -118,34 +95,15 @@ impl Widget for &App {
 
         let footer = Line::from(" STEPS LEFT: to be implemented ").centered();
 
-        let padding = Padding::new(
-            0,
-            0,
-            (rect.height - self.grid.get_length() as u16 - 1) / 2,
-            0,
-        );
-
         let block = Block::bordered()
             .title(header)
             .border_set(border::THICK)
-            .padding(padding)
             .title_bottom(footer);
 
-        let text: Text<'_> = if self.dirty {
-            Text::from_iter(
-                self.grid
-                    .get_array()
-                    .rows()
-                    .into_iter()
-                    .map(|row| Line::from_iter(row)),
-            )
-        } else {
-            self.grid_cache.clone()
-        };
+        let inner_rect = block.inner(rect);
 
-        Paragraph::new(text)
-            .centered()
-            .block(block)
-            .render(rect, buf);
+        block.render(rect, buf);
+
+        self.grid.render(inner_rect, buf);
     }
 }
