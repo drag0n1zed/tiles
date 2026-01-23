@@ -1,5 +1,4 @@
 mod grid;
-mod tile;
 
 use std::{
     error::Error,
@@ -32,7 +31,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     })?;
 
     // Export save file
-    write("grid.ron", grid.to_ron())?;
+    if false {
+        write("grid.ron", grid.to_ron())?;
+    }
 
     Ok(())
 }
@@ -85,7 +86,8 @@ impl App {
             (KeyCode::Down, _) => self.grid.move_grid(TileMoveDirection::Down),
             (KeyCode::Esc, _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => self.exit = true,
             _ => {}
-        }
+        };
+        self.grid.clear_connected_tiles();
     }
 }
 
@@ -101,9 +103,15 @@ impl Widget for &App {
             .title_bottom(footer);
 
         let inner_rect = block.inner(rect);
+        let inner_rect_with_margin = Rect::new(
+            inner_rect.x + 2,
+            inner_rect.y + 1,
+            inner_rect.width - 2,
+            inner_rect.height - 1,
+        );
 
         block.render(rect, buf);
 
-        self.grid.render(inner_rect, buf);
+        self.grid.render(inner_rect_with_margin, buf);
     }
 }

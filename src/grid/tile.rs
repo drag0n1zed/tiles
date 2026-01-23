@@ -9,19 +9,26 @@ use uid::Id;
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum Tile {
-    Empty(#[serde(skip)] Id<Tile>),
-    Blocker(#[serde(skip)] Id<Tile>),
-    Regular(#[serde(skip)] Id<Tile>, Color), // color
+    Empty,
+    Blocker {
+        #[serde(skip)]
+        id: Id<Tile>,
+    },
+    Regular {
+        #[serde(skip)]
+        id: Id<Tile>,
+        color: Color,
+    },
 }
 
 impl Widget for &Tile {
     fn render(self, rect: Rect, buf: &mut Buffer) {
         let rect = Rect::new(rect.x, rect.y, rect.width - 2, rect.height - 1);
         match self {
-            Tile::Empty(_) => {
+            Tile::Empty => {
                 buf.set_style(rect, Style::default().bg(Color::Black));
             }
-            Tile::Blocker(_) => {
+            Tile::Blocker { .. } => {
                 for x in rect.left()..rect.right() {
                     for y in rect.top()..rect.bottom() {
                         let symbol = if (x + y) % 2 == 0 { "░" } else { "▒" };
@@ -29,8 +36,8 @@ impl Widget for &Tile {
                     }
                 }
             }
-            Tile::Regular(_, color_code) => {
-                buf.set_style(rect, Style::default().bg(*color_code).fg(Color::White));
+            Tile::Regular { color, .. } => {
+                buf.set_style(rect, Style::default().bg(*color).fg(Color::White));
             }
         }
     }
