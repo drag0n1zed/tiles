@@ -10,10 +10,7 @@ use uid::Id;
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum Tile {
     Empty,
-    Blocker {
-        #[serde(skip)]
-        id: Id<Tile>,
-    },
+    Blocker,
     Regular {
         #[serde(skip)]
         id: Id<Tile>,
@@ -23,18 +20,25 @@ pub enum Tile {
 
 impl Widget for &Tile {
     fn render(self, rect: Rect, buf: &mut Buffer) {
-        let rect = Rect::new(rect.x, rect.y, rect.width - 2, rect.height - 1);
+        let rect = Rect::new(
+            rect.x,
+            rect.y,
+            rect.width.saturating_sub(2),
+            rect.height.saturating_sub(1),
+        );
         match self {
             Tile::Empty => {
                 buf.set_style(rect, Style::default().bg(Color::Black));
             }
             Tile::Blocker { .. } => {
+                /*
                 for x in rect.left()..rect.right() {
                     for y in rect.top()..rect.bottom() {
                         let symbol = if (x + y) % 2 == 0 { "░" } else { "▒" };
                         buf[(x, y)].set_symbol(symbol).set_fg(Color::Gray);
                     }
                 }
+                */
             }
             Tile::Regular { color, .. } => {
                 buf.set_style(rect, Style::default().bg(*color).fg(Color::White));

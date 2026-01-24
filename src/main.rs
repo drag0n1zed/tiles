@@ -1,11 +1,12 @@
 mod grid;
 
 use std::{
-    error::Error,
+    collections::VecDeque,
     fs::{read_to_string, write},
     time::{Duration, Instant},
 };
 
+use color_eyre::eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::{
     DefaultTerminal, Frame,
@@ -19,14 +20,15 @@ use ratatui::{
 
 use crate::grid::{Grid, TileMoveDirection};
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
+    color_eyre::install()?;
     // Import save file
     let grid = Grid::from_ron(read_to_string("grid.ron")?.as_str())?;
 
     let grid = ratatui::run(|terminal| {
         let mut app = App::from_grid(grid);
         app.run(terminal)?;
-        let result: Result<Grid, Box<dyn Error>> = Ok(app.into_grid());
+        let result: Result<Grid> = Ok(app.into_grid());
         result
     })?;
 
@@ -40,29 +42,46 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 struct App {
     grid: Grid,
-
+    input_queue: VecDeque<TileMoveDirection>,
     exit: bool,
 }
 
 impl App {
     fn from_grid(grid: Grid) -> Self {
-        Self { grid, exit: false }
+        Self {
+            grid,
+            input_queue: VecDeque::new(),
+            exit: false,
+        }
     }
 
     fn into_grid(self) -> Grid {
         self.grid
     }
 
-    fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<(), Box<dyn Error>> {
-        let tick_rate = Duration::from_millis(16);
+    fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
+        let tick_rate = Duration::from_millis(8);
         let mut last_tick = Instant::now();
+        let mut dirty = true;
         while !self.exit {
-            terminal.draw(|frame| self.draw(frame))?;
+            if dirty {
+                terminal.draw(|frame| self.draw(frame))?;
+            }
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+
+            let anim_ongoing = self.grid.update_grid();
+            dirty |= anim_ongoing;
+
+            if !anim_ongoing {
+                if let Some(input) = self.input_queue.pop_front() {
+                    self.grid.move_grid(input);
+                }
+            }
 
             if event::poll(timeout)? {
                 match event::read()? {
                     Event::Key(key) => self.handle_key_press(key),
+                    Event::Resize(_, _) => dirty |= true,
                     _ => (),
                 }
             }
@@ -80,14 +99,19 @@ impl App {
 
     fn handle_key_press(&mut self, key: event::KeyEvent) {
         match (key.code, key.modifiers) {
-            (KeyCode::Left, _) => self.grid.move_grid(TileMoveDirection::Left),
-            (KeyCode::Right, _) => self.grid.move_grid(TileMoveDirection::Right),
-            (KeyCode::Up, _) => self.grid.move_grid(TileMoveDirection::Up),
-            (KeyCode::Down, _) => self.grid.move_grid(TileMoveDirection::Down),
             (KeyCode::Esc, _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => self.exit = true,
             _ => {}
         };
-        self.grid.clear_connected_tiles();
+        if self.input_queue.len() <= 2 {
+            let input: Option<TileMoveDirection> = match (key.code, key.modifiers) {
+                (KeyCode::Left, _) => Some(TileMoveDirection::Left),
+                (KeyCode::Right, _) => Some(TileMoveDirection::Right),
+                (KeyCode::Up, _) => Some(TileMoveDirection::Up),
+                (KeyCode::Down, _) => Some(TileMoveDirection::Down),
+                _ => None,
+            };
+            self.input_queue.extend(input);
+        }
     }
 }
 

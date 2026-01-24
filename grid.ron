@@ -1,11 +1,11 @@
 (
     height: 5,
     width: 5,
-    pattern: [
+    data: [
         [Empty, Regular(color: "Green"), Regular(color: "Red"), Regular(color: "Red"), Regular(color: "Green")],
-        [Regular(color: "Red"), Empty, Regular(color: "Red"), Blocker(), Regular(color: "Green")],
+        [Regular(color: "Red"), Empty, Regular(color: "Red"), Blocker, Regular(color: "Green")],
         [Regular(color: "Blue"), Regular(color: "Yellow"), Regular(color: "Green"), Empty, Empty],
-        [Empty, Empty, Blocker(), Regular(color: "Yellow"), Regular(color: "Yellow")],
-        [Regular(color: "Blue"), Regular(color: "Blue"), Regular(color: "Blue"), Regular(color: "Yellow"), Blocker()],
+        [Empty, Empty, Blocker, Regular(color: "Yellow"), Regular(color: "Yellow")],
+        [Regular(color: "Blue"), Regular(color: "Blue"), Regular(color: "Blue"), Regular(color: "Yellow"), Blocker],
     ],
 )

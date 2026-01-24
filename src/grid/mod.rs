@@ -1,11 +1,10 @@
+mod animation;
 mod tile;
 mod vec_grid;
 
-use std::{
-    error::Error,
-    time::{Duration, Instant},
-};
+use std::time::Instant;
 
+use color_eyre::eyre::{Ok, Result};
 use ndarray::prelude::*;
 use ratatui::{
     buffer::Buffer,
@@ -16,17 +15,20 @@ use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use union_find::{QuickUnionUf, UnionBySize, UnionFind};
 
+use animation::Animation;
 use tile::Tile;
 use vec_grid::VecGrid;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(into = "VecGrid", from = "VecGrid")]
 pub struct Grid {
-    array: Array2<Tile>,
+    pub data: Array2<Tile>,
     #[serde(skip)]
-    active_animations: Vec<Animation>,
+    pub active_animations: Vec<Animation>,
     #[serde(skip)]
-    animation_mask: Array2<AnimationState>,
+    animation_mask: Array2<bool>,
+    #[serde(skip)]
+    pending_clear: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -37,45 +39,13 @@ pub enum TileMoveDirection {
     Right,
 }
 
-struct TileMoveEvent {
-    tile: Tile,
-    from: (usize, usize),
-    to: (usize, usize),
-}
-struct TileClearEvent {
-    tile: Tile,
-    at: (usize, usize),
-}
-
-#[derive(Clone, Copy)]
-enum Animation {
-    Moving {
-        tile: Tile,
-        start_rect: Rect,
-        end_rect: Rect,
-        start_time: Instant,
-        duration: Duration,
-    },
-    Clearing {
-        tile: Tile,
-        rect: Rect,
-        start_time: Instant,
-    },
-}
-
-#[derive(Clone, Copy)]
-enum AnimationState {
-    None,
-    Moving,
-    Clearing,
-}
-
 impl Grid {
     pub fn new(length: usize, width: usize) -> Self {
         Self {
-            array: Array2::from_elem((length, width), Tile::Empty),
+            data: Array2::from_elem((length, width), Tile::Empty),
             active_animations: vec![],
-            animation_mask: Array2::from_elem((length, width), AnimationState::None),
+            animation_mask: Array2::from_elem((length, width), false),
+            pending_clear: false,
         }
     }
 
@@ -84,63 +54,52 @@ impl Grid {
         ron::ser::to_string_pretty(&self, pretty_config).unwrap()
     }
 
-    pub fn from_ron(ron: &str) -> Result<Self, Box<dyn Error>> {
+    pub fn from_ron(ron: &str) -> Result<Self> {
         Ok(ron::de::from_str(ron)?)
     }
 
-    pub fn get_array(&self) -> &Array2<Tile> {
-        &self.array
-    }
-
     pub fn get_height(&self) -> usize {
-        self.array.dim().0
+        self.data.dim().0
     }
 
     pub fn get_width(&self) -> usize {
-        self.array.dim().1
+        self.data.dim().1
     }
 
     pub fn move_grid(&mut self, direction: TileMoveDirection) {
-        let mut events: Vec<TileMoveEvent> = vec![];
-
         match direction {
             TileMoveDirection::Left => {
                 for x in 0..self.get_width() {
                     for y in 0..self.get_height() {
-                        events.extend(self.move_tile(y, x, direction));
+                        self.move_tile(y, x, direction);
                     }
                 }
             }
             TileMoveDirection::Right => {
                 for x in (0..self.get_width()).rev() {
                     for y in 0..self.get_height() {
-                        events.extend(self.move_tile(y, x, direction));
+                        self.move_tile(y, x, direction);
                     }
                 }
             }
             TileMoveDirection::Up => {
                 for y in 0..self.get_height() {
                     for x in 0..self.get_width() {
-                        events.extend(self.move_tile(y, x, direction));
+                        self.move_tile(y, x, direction);
                     }
                 }
             }
             TileMoveDirection::Down => {
                 for y in (0..self.get_height()).rev() {
                     for x in 0..self.get_width() {
-                        events.extend(self.move_tile(y, x, direction));
+                        self.move_tile(y, x, direction);
                     }
                 }
             }
         };
     }
 
-    fn move_tile(
-        &mut self,
-        y: usize,
-        x: usize,
-        direction: TileMoveDirection,
-    ) -> Option<TileMoveEvent> {
+    fn move_tile(&mut self, y: usize, x: usize, direction: TileMoveDirection) {
         let (ty, tx) = match direction {
             TileMoveDirection::Left => (y, x.wrapping_sub(1)), // (y, x - 1)
             TileMoveDirection::Right => (y, x.wrapping_add(1)), // (y, x + 1)
@@ -148,30 +107,32 @@ impl Grid {
             TileMoveDirection::Down => (y.wrapping_add(1), x), // (y + 1, x)
         };
 
-        let from = self.array.get((y, x)).unwrap();
-        let Some(to) = self.array.get((ty, tx)) else {
+        let from = self.data.get((y, x)).unwrap();
+        let Some(to) = self.data.get((ty, tx)) else {
             // Hit the wall
-            return None;
+            return;
         };
 
-        let mut tile_change = None;
         // Target is regular or blocker tile: cannot move
         // Origin is empty or blocker tile: cannot move
         if let (Tile::Regular { .. }, Tile::Empty) = (from, to) {
-            tile_change = Some(TileMoveEvent {
+            self.active_animations.push(Animation::Moving {
                 tile: *from,
                 from: (y, x),
                 to: (ty, tx),
+                start_time: Instant::now(),
             });
-            self.array.swap((y, x), (ty, tx));
+            self.animation_mask[[y, x]] = true;
+            self.animation_mask[[ty, tx]] = true;
+            self.data.swap((y, x), (ty, tx));
+            self.pending_clear = true;
         }
-        tile_change
     }
 
     pub fn clear_connected_tiles(&mut self) {
         let (length, width) = (self.get_height(), self.get_width());
         let mut uf = QuickUnionUf::<UnionBySize>::new(length * width);
-        for ((y, x), tile) in self.array.indexed_iter() {
+        for ((y, x), tile) in self.data.indexed_iter() {
             let Tile::Regular { color, .. } = tile else {
                 continue;
             };
@@ -180,7 +141,7 @@ impl Grid {
             if x + 1 < width {
                 if let Tile::Regular {
                     color: right_color, ..
-                } = self.array.get((y, x + 1)).unwrap()
+                } = self.data.get((y, x + 1)).unwrap()
                     && color == right_color
                 {
                     uf.union(index, index + 1);
@@ -190,7 +151,7 @@ impl Grid {
                 if let Tile::Regular {
                     color: bottom_color,
                     ..
-                } = self.array.get((y + 1, x)).unwrap()
+                } = self.data.get((y + 1, x)).unwrap()
                     && color == bottom_color
                 {
                     uf.union(index, index + width);
@@ -198,8 +159,7 @@ impl Grid {
             }
         }
 
-        let mut events: Vec<TileClearEvent> = vec![];
-        for ((y, x), tile) in self.array.indexed_iter_mut() {
+        for ((y, x), tile) in self.data.indexed_iter_mut() {
             let Tile::Regular { .. } = tile else {
                 continue;
             };
@@ -207,11 +167,41 @@ impl Grid {
             let index = y * width + x;
             let root_index = uf.find(index);
             if uf.get(root_index).size() >= 4 {
-                events.push(TileClearEvent {
+                self.active_animations.push(Animation::Clearing {
                     tile: *tile,
                     at: (y, x),
+                    start_time: Instant::now(),
                 });
+                self.animation_mask[[y, x]] = true;
                 *tile = Tile::Empty;
+            }
+        }
+    }
+
+    pub fn update_grid(&mut self) -> bool {
+        self.clear_completed_animations();
+
+        if self.active_animations.is_empty() && self.pending_clear == true {
+            self.pending_clear = false;
+            self.clear_connected_tiles(); // Populates animations again
+        }
+        !self.active_animations.is_empty()
+    }
+
+    fn clear_completed_animations(&mut self) {
+        self.active_animations.retain(|anim| anim.is_active());
+
+        self.animation_mask.fill(false);
+
+        for anim in &self.active_animations {
+            match anim {
+                Animation::Moving { from, to, .. } => {
+                    self.animation_mask[*from] = true;
+                    self.animation_mask[*to] = true;
+                }
+                Animation::Clearing { at, .. } => {
+                    self.animation_mask[*at] = true;
+                }
             }
         }
     }
@@ -232,6 +222,8 @@ impl Widget for &Grid {
             Rect::new(start_x, start_y, new_rect_w, new_rect_h)
         };
 
+        let mut rect_lookup_table = Array2::from_elem((self.get_height(), self.get_width()), None);
+
         let row_constraints =
             (0..self.get_height()).map(|_| Constraint::Ratio(1, self.get_height() as u32));
 
@@ -250,10 +242,28 @@ impl Widget for &Grid {
                 .split(*row_rect);
 
             for (x, tile_rect) in col_rects.iter().enumerate() {
-                self.get_array()
-                    .get((y, x))
-                    .unwrap()
-                    .render(*tile_rect, buf);
+                if self.animation_mask[[y, x]] {
+                    let empty = Tile::Empty;
+                    empty.render(*tile_rect, buf);
+                    rect_lookup_table[[y, x]] = Some(*tile_rect);
+                } else {
+                    self.data[[y, x]].render(*tile_rect, buf);
+                }
+            }
+        }
+
+        for animation in &self.active_animations {
+            match animation {
+                Animation::Moving { from, to, .. } => {
+                    animation.render_moving(
+                        rect_lookup_table[*from].unwrap(),
+                        rect_lookup_table[*to].unwrap(),
+                        buf,
+                    );
+                }
+                Animation::Clearing { at, .. } => {
+                    animation.render_clearing(rect_lookup_table[*at].unwrap(), buf);
+                }
             }
         }
     }

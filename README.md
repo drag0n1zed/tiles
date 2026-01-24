@@ -8,7 +8,7 @@
 TODO:
 - Game
   - [x] 4+ connected tiles disappear
-    - [ ] Disappear animation
+    - [x] Disappear animation
   - [ ] Integrated solver
   - [ ] Steps before game over
   - [ ] Levels?
@@ -17,7 +17,7 @@ TODO:
   - [x] Display the grid
     - [x] Tile color
     - [x] Tile textures
-    - [ ] Move animation
+    - [x] Move animation
   - [ ] Import / export save in TUI
     - [ ] Choose save in command line
   - [ ] Edit mode: hjkl / arrow keys to select tile, r (replace) / enter to change tile
