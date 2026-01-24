@@ -3,7 +3,7 @@
 > [!NOTE]
 > Inspired by *Color Tiles*.
 
-https://github.com/user-attachments/assets/98dbedb8-4956-4cb2-804e-42de70f777fb
+https://github.com/user-attachments/assets/56c3829e-f352-44c1-8153-77d44cbac512
 
 TODO:
 - Game
