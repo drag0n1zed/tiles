@@ -3,7 +3,7 @@
 > [!NOTE]
 > Inspired by *Color Tiles*.
 
-![showcase](assets/showcase.png)
+![showcase](assets/showcase.gif)
 
 TODO:
 - Game
