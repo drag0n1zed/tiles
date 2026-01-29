@@ -78,7 +78,7 @@ impl App {
             if game_tick_timer.ready() {
                 self.grid.update_anim_state();
 
-                if self.grid.anim_completed()
+                if self.grid.is_anim_completed()
                     && let Some(input) = self.input_queue.pop_front()
                 {
                     self.grid.move_grid(input);
@@ -139,6 +139,6 @@ impl Widget for &App {
 
         block.render(rect, buf);
 
-        self.grid.render(inner_rect_with_margin, buf);
+        self.grid.as_widget().render(inner_rect_with_margin, buf);
     }
 }

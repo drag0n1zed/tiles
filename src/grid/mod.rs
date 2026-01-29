@@ -1,16 +1,12 @@
 mod animation;
 mod tile;
 mod vec_grid;
+mod widget;
 
 use std::time::Instant;
 
 use color_eyre::eyre::{Ok, Result};
 use ndarray::prelude::*;
-use ratatui::{
-    buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Rect},
-    widgets::Widget,
-};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use union_find::{QuickUnionUf, UnionBySize, UnionFind};
@@ -18,6 +14,8 @@ use union_find::{QuickUnionUf, UnionBySize, UnionFind};
 use animation::Animation;
 use tile::Tile;
 use vec_grid::VecGrid;
+
+use crate::grid::widget::GridWidget;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(into = "VecGrid", from = "VecGrid")]
@@ -60,6 +58,14 @@ impl Grid {
         Ok(ron::de::from_str(ron)?)
     }
 
+    pub fn as_widget(&self) -> GridWidget<'_> {
+        GridWidget {
+            tiles: self.data.view(),
+            animations: &self.active_animations,
+            animation_mask: self.animation_mask.view(),
+        }
+    }
+
     pub fn get_height(&self) -> usize {
         self.data.dim().0
     }
@@ -68,7 +74,11 @@ impl Grid {
         self.data.dim().1
     }
 
-    pub fn anim_completed(&self) -> bool {
+    pub fn pos_to_index(&self, y: usize, x: usize) -> usize {
+        y * self.get_width() + x
+    }
+
+    pub fn is_anim_completed(&self) -> bool {
         self.active_animations.is_empty()
     }
 
@@ -140,6 +150,33 @@ impl Grid {
         }
     }
 
+    pub fn update_anim_state(&mut self) {
+        self.clear_completed_animations();
+
+        if self.active_animations.is_empty() && self.pending_pop {
+            self.pending_pop = false;
+            self.pop_connected_tiles(); // Populates animations again
+        }
+    }
+
+    fn clear_completed_animations(&mut self) {
+        self.active_animations.retain(|anim| anim.is_active());
+
+        self.animation_mask.fill(false);
+
+        for anim in &self.active_animations {
+            match anim {
+                Animation::Moving { from, to, .. } => {
+                    self.animation_mask[*from] = true;
+                    self.animation_mask[*to] = true;
+                }
+                Animation::Clearing { at, .. } => {
+                    self.animation_mask[*at] = true;
+                }
+            }
+        }
+    }
+
     fn pop_connected_tiles(&mut self) {
         let (length, width) = (self.get_height(), self.get_width());
         let mut uf = QuickUnionUf::<UnionBySize>::new(length * width);
@@ -174,95 +211,6 @@ impl Grid {
                 self.animation_mask[[y, x]] = true;
 
                 *tile = Tile::Empty;
-            }
-        }
-    }
-
-    pub fn update_anim_state(&mut self) {
-        self.clear_completed_animations();
-
-        if self.active_animations.is_empty() && self.pending_pop {
-            self.pending_pop = false;
-            self.pop_connected_tiles(); // Populates animations again
-        }
-    }
-
-    fn clear_completed_animations(&mut self) {
-        self.active_animations.retain(|anim| anim.is_active());
-
-        self.animation_mask.fill(false);
-
-        for anim in &self.active_animations {
-            match anim {
-                Animation::Moving { from, to, .. } => {
-                    self.animation_mask[*from] = true;
-                    self.animation_mask[*to] = true;
-                }
-                Animation::Clearing { at, .. } => {
-                    self.animation_mask[*at] = true;
-                }
-            }
-        }
-    }
-}
-
-impl Widget for &Grid {
-    fn render(self, rect: Rect, buf: &mut Buffer) {
-        // Aspect ratio adjustment
-        let grid_rect = {
-            let (rect_w, rect_h) = (rect.width, rect.height);
-            let (grid_w, grid_h) = (self.get_width() as u16, self.get_height() as u16);
-            let ratio = (rect_w / (grid_w * 2)).min(rect_h / grid_h).max(1);
-            let (new_rect_w, new_rect_h) = (grid_w * ratio * 2, grid_h * ratio);
-            let (start_x, start_y) = (
-                rect.x + (rect_w.saturating_sub(new_rect_w)) / 2,
-                rect.y + (rect_h.saturating_sub(new_rect_h)) / 2,
-            );
-            Rect::new(start_x, start_y, new_rect_w, new_rect_h)
-        };
-
-        let mut rect_lookup_table = Array2::from_elem((self.get_height(), self.get_width()), None);
-
-        let row_constraints =
-            (0..self.get_height()).map(|_| Constraint::Ratio(1, self.get_height() as u32));
-
-        let row_rects = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(row_constraints)
-            .split(grid_rect);
-
-        for (y, row_rect) in row_rects.iter().enumerate() {
-            let col_constraints =
-                (0..self.get_width()).map(|_| Constraint::Ratio(1, self.get_width() as u32));
-
-            let col_rects = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints(col_constraints)
-                .split(*row_rect);
-
-            for (x, tile_rect) in col_rects.iter().enumerate() {
-                if self.animation_mask[[y, x]] {
-                    let empty = Tile::Empty;
-                    empty.render(*tile_rect, buf);
-                    rect_lookup_table[[y, x]] = Some(*tile_rect);
-                } else {
-                    self.data[[y, x]].render(*tile_rect, buf);
-                }
-            }
-        }
-
-        for animation in &self.active_animations {
-            match animation {
-                Animation::Moving { from, to, .. } => {
-                    animation.render_moving(
-                        rect_lookup_table[*from].unwrap(),
-                        rect_lookup_table[*to].unwrap(),
-                        buf,
-                    );
-                }
-                Animation::Clearing { at, .. } => {
-                    animation.render_clearing(rect_lookup_table[*at].unwrap(), buf);
-                }
             }
         }
     }
