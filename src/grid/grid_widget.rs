@@ -1,4 +1,4 @@
-use super::{Animation, Tile};
+use super::{Animation, Tile, grid_layout::GridLayout};
 use ndarray::ArrayView2;
 use ratatui::{
     buffer::Buffer,
@@ -57,17 +57,12 @@ impl<'a> Widget for GridWidget<'a> {
             }
         }
 
-        let get_rect = |(r, c): (usize, usize)| -> Rect { rect_lookup[r * width + c] }; // say that again?
+        let layout = &GridLayout::new(rect_lookup, width);
 
         for animation in self.animations {
-            match animation {
-                Animation::Moving { from, to, .. } => {
-                    animation.render_moving(get_rect(*from), get_rect(*to), buf);
-                }
-                Animation::Clearing { at, .. } => {
-                    animation.render_clearing(get_rect(*at), buf);
-                }
-            }
+            animation
+                .with_layout(layout)
+                .render(Default::default(), buf);
         }
     }
 }

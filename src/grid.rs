@@ -1,7 +1,8 @@
 mod animation;
+mod grid_layout;
+mod grid_widget;
 mod tile;
 mod vec_grid;
-mod widget;
 
 use std::time::Instant;
 
@@ -12,10 +13,9 @@ use serde::{Deserialize, Serialize};
 use union_find::{QuickUnionUf, UnionBySize, UnionFind};
 
 use animation::Animation;
+use grid_widget::GridWidget;
 use tile::Tile;
 use vec_grid::VecGrid;
-
-use crate::grid::widget::GridWidget;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(into = "VecGrid", from = "VecGrid")]

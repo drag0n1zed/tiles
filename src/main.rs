@@ -1,11 +1,7 @@
 mod grid;
 mod timer;
 
-use std::{
-    collections::VecDeque,
-    fs::{read_to_string, write},
-    time::Duration,
-};
+use std::{collections::VecDeque, fs, time::Duration};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
@@ -27,7 +23,7 @@ use crate::{
 fn main() -> Result<()> {
     color_eyre::install()?;
     // Import save file
-    let grid = Grid::from_ron(read_to_string("grid.ron")?.as_str())?;
+    let grid = Grid::from_ron(fs::read_to_string("grid.ron")?.as_str())?;
 
     let grid = ratatui::run(|terminal| {
         let mut app = App::from_grid(grid);
@@ -38,7 +34,7 @@ fn main() -> Result<()> {
 
     // Export save file
     if false {
-        write("grid.ron", grid.to_ron())?;
+        fs::write("grid.ron", grid.to_ron())?;
     }
 
     Ok(())
@@ -116,9 +112,9 @@ impl Widget for &App {
 
         let footer = {
             let spans = vec![
-                Span::raw(" STEPS LEFT: "),
-                Span::raw(self.grid.steps.to_string()),
                 Span::raw(" "),
+                Span::raw(self.grid.steps.to_string()).bold(),
+                Span::raw(" moves remaining "),
             ];
 
             Line::from(spans)

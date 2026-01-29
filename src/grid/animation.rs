@@ -1,7 +1,30 @@
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use std::time::{Duration, Instant};
 
-use crate::grid::tile::Tile;
+use crate::grid::{grid_layout::GridLayout, tile::Tile};
+
+pub struct AnimationWidget<'a> {
+    pub anim: &'a Animation,
+    pub grid_layout: &'a GridLayout,
+}
+
+impl<'a> Widget for AnimationWidget<'a> {
+    fn render(self, _rect: Rect, buf: &mut Buffer) {
+        match self.anim {
+            Animation::Moving { tile, from, to, .. } => {
+                let (from_rect, to_rect) = (
+                    self.grid_layout.get_rect_from_coords(from),
+                    self.grid_layout.get_rect_from_coords(to),
+                );
+                self.anim.render_moving(tile, from_rect, to_rect, buf);
+            }
+            Animation::Clearing { tile, at, .. } => {
+                let at_rect = self.grid_layout.get_rect_from_coords(at);
+                self.anim.render_clearing(tile, at_rect, buf);
+            }
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub enum Animation {
@@ -22,15 +45,17 @@ impl Animation {
     pub fn duration(&self) -> Duration {
         match self {
             Animation::Moving { .. } => Duration::from_millis(200),
-            Animation::Clearing { .. } => Duration::from_millis(100),
+            Animation::Clearing { .. } => Duration::from_millis(150),
+        }
+    }
+    pub fn with_layout<'a>(&'a self, grid_layout: &'a GridLayout) -> AnimationWidget<'a> {
+        AnimationWidget {
+            anim: self,
+            grid_layout,
         }
     }
 
-    pub fn render_moving(&self, from_rect: Rect, to_rect: Rect, buf: &mut Buffer) {
-        let Animation::Moving { tile, .. } = self else {
-            return;
-        };
-
+    fn render_moving(&self, tile: &Tile, from_rect: Rect, to_rect: Rect, buf: &mut Buffer) {
         let t = self.get_quartic_out_progress();
         let start_x = from_rect.x as f64;
         let start_y = from_rect.y as f64;
@@ -50,11 +75,7 @@ impl Animation {
         tile.render(current_rect, buf);
     }
 
-    pub fn render_clearing(&self, at_rect: Rect, buf: &mut Buffer) {
-        let Animation::Clearing { tile, .. } = self else {
-            return;
-        };
-
+    fn render_clearing(&self, tile: &Tile, at_rect: Rect, buf: &mut Buffer) {
         let t = 1.0 - self.get_quadratic_out_progress();
         let target_width = (at_rect.width as f64 * t).round() as u16;
         let target_height = (at_rect.height as f64 * t).round() as u16;
