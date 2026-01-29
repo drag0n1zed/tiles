@@ -10,7 +10,7 @@ TODO:
   - [x] 4+ connected tiles disappear
     - [x] Disappear animation
   - [ ] Integrated solver
-  - [ ] Steps before game over
+  - [x] Steps before game over
   - [ ] Levels?
 
 - TUI
