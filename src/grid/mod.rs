@@ -74,10 +74,6 @@ impl Grid {
         self.data.dim().1
     }
 
-    pub fn pos_to_index(&self, y: usize, x: usize) -> usize {
-        y * self.get_width() + x
-    }
-
     pub fn is_anim_completed(&self) -> bool {
         self.active_animations.is_empty()
     }
