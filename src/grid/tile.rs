@@ -30,7 +30,7 @@ impl Widget for &Tile {
             Tile::Empty => {
                 buf.set_style(rect, Style::default().bg(Color::Black));
             }
-            Tile::Blocker { .. } => {
+            Tile::Blocker => {
                 /*
                 for x in rect.left()..rect.right() {
                     for y in rect.top()..rect.bottom() {

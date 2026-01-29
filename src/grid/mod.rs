@@ -22,13 +22,14 @@ use vec_grid::VecGrid;
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(into = "VecGrid", from = "VecGrid")]
 pub struct Grid {
+    pub steps: usize,
     pub data: Array2<Tile>,
     #[serde(skip)]
     pub active_animations: Vec<Animation>,
     #[serde(skip)]
     animation_mask: Array2<bool>,
     #[serde(skip)]
-    pending_clear: bool,
+    pending_pop: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -40,12 +41,13 @@ pub enum TileMoveDirection {
 }
 
 impl Grid {
-    pub fn new(length: usize, width: usize) -> Self {
+    pub fn new(length: usize, width: usize, steps: usize) -> Self {
         Self {
             data: Array2::from_elem((length, width), Tile::Empty),
-            active_animations: vec![],
+            steps,
+            active_animations: Vec::new(),
             animation_mask: Array2::from_elem((length, width), false),
-            pending_clear: false,
+            pending_pop: false,
         }
     }
 
@@ -66,7 +68,14 @@ impl Grid {
         self.data.dim().1
     }
 
+    pub fn anim_completed(&self) -> bool {
+        self.active_animations.is_empty()
+    }
+
     pub fn move_grid(&mut self, direction: TileMoveDirection) {
+        if self.steps == 0 {
+            return;
+        }
         match direction {
             TileMoveDirection::Left => {
                 for x in 0..self.get_width() {
@@ -97,6 +106,8 @@ impl Grid {
                 }
             }
         };
+
+        self.steps = self.steps.saturating_sub(1);
     }
 
     fn move_tile(&mut self, y: usize, x: usize, direction: TileMoveDirection) {
@@ -125,11 +136,11 @@ impl Grid {
             self.animation_mask[[y, x]] = true;
             self.animation_mask[[ty, tx]] = true;
             self.data.swap((y, x), (ty, tx));
-            self.pending_clear = true;
+            self.pending_pop = true;
         }
     }
 
-    pub fn clear_connected_tiles(&mut self) {
+    fn pop_connected_tiles(&mut self) {
         let (length, width) = (self.get_height(), self.get_width());
         let mut uf = QuickUnionUf::<UnionBySize>::new(length * width);
         for ((y, x), tile) in self.data.indexed_iter() {
@@ -138,23 +149,11 @@ impl Grid {
             };
             let index = y * width + x;
 
-            if x + 1 < width {
-                if let Tile::Regular {
-                    color: right_color, ..
-                } = self.data.get((y, x + 1)).unwrap()
-                    && color == right_color
+            let neighbors = [(x + 1, y, index + 1), (x, y + 1, index + width)]; // Right, Down
+            for (nx, ny, n_index) in neighbors {
+                if matches!(&self.data.get((ny, nx)), Some(Tile::Regular { color: c, .. }) if c == color)
                 {
-                    uf.union(index, index + 1);
-                }
-            }
-            if y + 1 < length {
-                if let Tile::Regular {
-                    color: bottom_color,
-                    ..
-                } = self.data.get((y + 1, x)).unwrap()
-                    && color == bottom_color
-                {
-                    uf.union(index, index + width);
+                    uf.union(index, n_index);
                 }
             }
         }
@@ -173,19 +172,19 @@ impl Grid {
                     start_time: Instant::now(),
                 });
                 self.animation_mask[[y, x]] = true;
+
                 *tile = Tile::Empty;
             }
         }
     }
 
-    pub fn update_grid(&mut self) -> bool {
+    pub fn update_anim_state(&mut self) {
         self.clear_completed_animations();
 
-        if self.active_animations.is_empty() && self.pending_clear == true {
-            self.pending_clear = false;
-            self.clear_connected_tiles(); // Populates animations again
+        if self.active_animations.is_empty() && self.pending_pop {
+            self.pending_pop = false;
+            self.pop_connected_tiles(); // Populates animations again
         }
-        !self.active_animations.is_empty()
     }
 
     fn clear_completed_animations(&mut self) {

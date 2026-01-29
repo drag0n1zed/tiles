@@ -1,9 +1,10 @@
 mod grid;
+mod timer;
 
 use std::{
     collections::VecDeque,
     fs::{read_to_string, write},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use color_eyre::eyre::Result;
@@ -14,11 +15,14 @@ use ratatui::{
     layout::Rect,
     style::Stylize,
     symbols::border,
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Widget},
 };
 
-use crate::grid::{Grid, TileMoveDirection};
+use crate::{
+    grid::{Grid, TileMoveDirection},
+    timer::Timer,
+};
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -60,34 +64,25 @@ impl App {
     }
 
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
-        let tick_rate = Duration::from_millis(8);
-        let mut last_tick = Instant::now();
-        let mut dirty = true;
+        let mut game_tick_timer = Timer::new(Duration::from_millis(8));
         while !self.exit {
-            if dirty {
-                terminal.draw(|frame| self.draw(frame))?;
+            terminal.draw(|frame| self.draw(frame))?;
+
+            if event::poll(game_tick_timer.time_until_ready())? {
+                if let Event::Key(key) = event::read()? {
+                    self.handle_key_press(key);
+                }
             }
-            let timeout = tick_rate.saturating_sub(last_tick.elapsed());
 
-            let anim_ongoing = self.grid.update_grid();
-            dirty |= anim_ongoing;
+            // Execute every tick:
+            if game_tick_timer.ready() {
+                self.grid.update_anim_state();
 
-            if !anim_ongoing {
-                if let Some(input) = self.input_queue.pop_front() {
+                if self.grid.anim_completed()
+                    && let Some(input) = self.input_queue.pop_front()
+                {
                     self.grid.move_grid(input);
                 }
-            }
-
-            if event::poll(timeout)? {
-                match event::read()? {
-                    Event::Key(key) => self.handle_key_press(key),
-                    Event::Resize(_, _) => dirty |= true,
-                    _ => (),
-                }
-            }
-
-            if last_tick.elapsed() >= tick_rate {
-                last_tick = Instant::now();
             }
         }
         Ok(())
@@ -119,12 +114,20 @@ impl Widget for &App {
     fn render(self, rect: Rect, buf: &mut Buffer) {
         let header = Line::from(" TILES ".bold());
 
-        let footer = Line::from(" STEPS LEFT: to be implemented ").centered();
+        let footer = {
+            let spans = vec![
+                Span::raw(" STEPS LEFT: "),
+                Span::raw(self.grid.steps.to_string()),
+                Span::raw(" "),
+            ];
+
+            Line::from(spans)
+        };
 
         let block = Block::bordered()
             .title(header)
             .border_set(border::THICK)
-            .title_bottom(footer);
+            .title_bottom(footer.centered());
 
         let inner_rect = block.inner(rect);
         let inner_rect_with_margin = Rect::new(
