@@ -31,7 +31,7 @@ pub struct Grid {
 }
 
 #[derive(Clone, Copy)]
-pub enum TileMoveDirection {
+pub enum MoveDirection {
     Up,
     Down,
     Left,
@@ -78,36 +78,36 @@ impl Grid {
         self.active_animations.is_empty()
     }
 
-    pub fn move_grid(&mut self, direction: TileMoveDirection) {
+    pub fn move_grid(&mut self, direction: MoveDirection) {
         if self.steps == 0 {
             return;
         }
         match direction {
-            TileMoveDirection::Left => {
-                for x in 0..self.get_width() {
-                    for y in 0..self.get_height() {
-                        self.move_tile(y, x, direction);
+            MoveDirection::Left => {
+                for dx in 0..self.get_width() {
+                    for dy in 0..self.get_height() {
+                        self.move_tile(dy, dx, direction);
                     }
                 }
             }
-            TileMoveDirection::Right => {
-                for x in (0..self.get_width()).rev() {
-                    for y in 0..self.get_height() {
-                        self.move_tile(y, x, direction);
+            MoveDirection::Right => {
+                for dx in (0..self.get_width()).rev() {
+                    for dy in 0..self.get_height() {
+                        self.move_tile(dy, dx, direction);
                     }
                 }
             }
-            TileMoveDirection::Up => {
-                for y in 0..self.get_height() {
-                    for x in 0..self.get_width() {
-                        self.move_tile(y, x, direction);
+            MoveDirection::Up => {
+                for dy in 0..self.get_height() {
+                    for dx in 0..self.get_width() {
+                        self.move_tile(dy, dx, direction);
                     }
                 }
             }
-            TileMoveDirection::Down => {
-                for y in (0..self.get_height()).rev() {
-                    for x in 0..self.get_width() {
-                        self.move_tile(y, x, direction);
+            MoveDirection::Down => {
+                for dy in (0..self.get_height()).rev() {
+                    for dx in 0..self.get_width() {
+                        self.move_tile(dy, dx, direction);
                     }
                 }
             }
@@ -116,12 +116,12 @@ impl Grid {
         self.steps = self.steps.saturating_sub(1);
     }
 
-    fn move_tile(&mut self, y: usize, x: usize, direction: TileMoveDirection) {
+    fn move_tile(&mut self, y: usize, x: usize, direction: MoveDirection) {
         let (ty, tx) = match direction {
-            TileMoveDirection::Left => (y, x.wrapping_sub(1)), // (y, x - 1)
-            TileMoveDirection::Right => (y, x.wrapping_add(1)), // (y, x + 1)
-            TileMoveDirection::Up => (y.wrapping_sub(1), x),   // (y - 1, x)
-            TileMoveDirection::Down => (y.wrapping_add(1), x), // (y + 1, x)
+            MoveDirection::Left => (y, x.wrapping_sub(1)), // (y, x - 1)
+            MoveDirection::Right => (y, x.wrapping_add(1)), // (y, x + 1)
+            MoveDirection::Up => (y.wrapping_sub(1), x),   // (y - 1, x)
+            MoveDirection::Down => (y.wrapping_add(1), x), // (y + 1, x)
         };
 
         let from = self.data.get((y, x)).unwrap();
@@ -136,7 +136,7 @@ impl Grid {
             self.active_animations.push(Animation::Moving {
                 tile: *from,
                 from: (y, x),
-                to: (ty, tx),
+                direction,
                 start_time: Instant::now(),
             });
             self.animation_mask[[y, x]] = true;
@@ -162,9 +162,10 @@ impl Grid {
 
         for anim in &self.active_animations {
             match anim {
-                Animation::Moving { from, to, .. } => {
+                Animation::Moving { from, .. } => {
+                    let to = anim.get_target().unwrap();
                     self.animation_mask[*from] = true;
-                    self.animation_mask[*to] = true;
+                    self.animation_mask[to] = true;
                 }
                 Animation::Clearing { at, .. } => {
                     self.animation_mask[*at] = true;

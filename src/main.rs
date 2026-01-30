@@ -9,14 +9,14 @@ use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
     layout::Rect,
-    style::Stylize,
+    style::{Color, Style, Styled, Stylize},
     symbols::border,
     text::{Line, Span},
     widgets::{Block, Widget},
 };
 
 use crate::{
-    grid::{Grid, TileMoveDirection},
+    grid::{Grid, MoveDirection},
     timer::Timer,
 };
 
@@ -42,7 +42,7 @@ fn main() -> Result<()> {
 
 struct App {
     grid: Grid,
-    input_queue: VecDeque<TileMoveDirection>,
+    input_queue: VecDeque<MoveDirection>,
     exit: bool,
 }
 
@@ -94,11 +94,11 @@ impl App {
             _ => {}
         };
         if self.input_queue.len() <= 2 {
-            let input: Option<TileMoveDirection> = match (key.code, key.modifiers) {
-                (KeyCode::Left, _) => Some(TileMoveDirection::Left),
-                (KeyCode::Right, _) => Some(TileMoveDirection::Right),
-                (KeyCode::Up, _) => Some(TileMoveDirection::Up),
-                (KeyCode::Down, _) => Some(TileMoveDirection::Down),
+            let input: Option<MoveDirection> = match (key.code, key.modifiers) {
+                (KeyCode::Left, _) => Some(MoveDirection::Left),
+                (KeyCode::Right, _) => Some(MoveDirection::Right),
+                (KeyCode::Up, _) => Some(MoveDirection::Up),
+                (KeyCode::Down, _) => Some(MoveDirection::Down),
                 _ => None,
             };
             self.input_queue.extend(input);
@@ -123,7 +123,8 @@ impl Widget for &App {
         let block = Block::bordered()
             .title(header)
             .border_set(border::THICK)
-            .title_bottom(footer.centered());
+            .title_bottom(footer.centered())
+            .set_style(Style::default().bg(Color::Reset));
 
         let inner_rect = block.inner(rect);
         let inner_rect_with_margin = Rect::new(

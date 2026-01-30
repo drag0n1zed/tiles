@@ -13,7 +13,7 @@ impl GridLayout {
         }
     }
 
-    pub fn get_rect_from_coords(&self, (y, x): &(usize, usize)) -> Rect {
+    pub fn get_rect_from_coords(&self, (y, x): (usize, usize)) -> Rect {
         self.rect_lookup[y * self.grid_width + x]
     }
 }

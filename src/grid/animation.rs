@@ -1,7 +1,7 @@
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use std::time::{Duration, Instant};
 
-use crate::grid::{grid_layout::GridLayout, tile::Tile};
+use crate::grid::{MoveDirection, grid_layout::GridLayout, tile::Tile};
 
 pub struct AnimationWidget<'a> {
     pub anim: &'a Animation,
@@ -11,15 +11,22 @@ pub struct AnimationWidget<'a> {
 impl<'a> Widget for AnimationWidget<'a> {
     fn render(self, _rect: Rect, buf: &mut Buffer) {
         match self.anim {
-            Animation::Moving { tile, from, to, .. } => {
+            Animation::Moving {
+                tile,
+                from,
+                direction,
+                ..
+            } => {
+                let to = self.anim.get_target().unwrap();
                 let (from_rect, to_rect) = (
-                    self.grid_layout.get_rect_from_coords(from),
+                    self.grid_layout.get_rect_from_coords(*from),
                     self.grid_layout.get_rect_from_coords(to),
                 );
-                self.anim.render_moving(tile, from_rect, to_rect, buf);
+                self.anim
+                    .render_moving(tile, from_rect, to_rect, *direction, buf);
             }
             Animation::Clearing { tile, at, .. } => {
-                let at_rect = self.grid_layout.get_rect_from_coords(at);
+                let at_rect = self.grid_layout.get_rect_from_coords(*at);
                 self.anim.render_clearing(tile, at_rect, buf);
             }
         }
@@ -31,7 +38,7 @@ pub enum Animation {
     Moving {
         tile: Tile,
         from: (usize, usize),
-        to: (usize, usize),
+        direction: MoveDirection,
         start_time: Instant,
     },
     Clearing {
@@ -44,9 +51,26 @@ pub enum Animation {
 impl Animation {
     pub fn duration(&self) -> Duration {
         match self {
-            Animation::Moving { .. } => Duration::from_millis(200),
-            Animation::Clearing { .. } => Duration::from_millis(150),
+            Animation::Moving { .. } => Duration::from_millis(300),
+            Animation::Clearing { .. } => Duration::from_millis(200),
         }
+    }
+
+    // Returns Some containing target tile grid coordinates if self is Animation::Moving, returns None otherwise
+    pub fn get_target(&self) -> Option<(usize, usize)> {
+        let Animation::Moving {
+            from, direction, ..
+        } = self
+        else {
+            return None;
+        };
+        let (y, x) = *from;
+        Some(match direction {
+            MoveDirection::Up => (y.saturating_sub(1), x),
+            MoveDirection::Down => (y.saturating_add(1), x),
+            MoveDirection::Left => (y, x.saturating_sub(1)),
+            MoveDirection::Right => (y, x.saturating_add(1)),
+        })
     }
     pub fn with_layout<'a>(&'a self, grid_layout: &'a GridLayout) -> AnimationWidget<'a> {
         AnimationWidget {
@@ -55,8 +79,16 @@ impl Animation {
         }
     }
 
-    fn render_moving(&self, tile: &Tile, from_rect: Rect, to_rect: Rect, buf: &mut Buffer) {
+    fn render_moving(
+        &self,
+        tile: &Tile,
+        from_rect: Rect,
+        to_rect: Rect,
+        direction: MoveDirection,
+        buf: &mut Buffer,
+    ) {
         let t = self.get_quartic_out_progress();
+
         let start_x = from_rect.x as f64;
         let start_y = from_rect.y as f64;
         let end_x = to_rect.x as f64;
@@ -65,14 +97,24 @@ impl Animation {
         let current_x = start_x + (end_x - start_x) * t;
         let current_y = start_y + (end_y - start_y) * t;
 
-        let current_rect = Rect::new(
-            current_x.round() as u16,
-            current_y.round() as u16,
-            from_rect.width,
-            from_rect.height,
-        );
+        let x_int = current_x.floor() as u16;
+        let y_int = current_y.floor() as u16;
 
-        tile.render(current_rect, buf);
+        let offset_x = current_x.fract();
+        let offset_y = current_y.fract();
+
+        let (offset, rect) = match direction {
+            MoveDirection::Up | MoveDirection::Down => (
+                offset_y,
+                Rect::new(from_rect.x, y_int, from_rect.width, from_rect.height),
+            ),
+            MoveDirection::Left | MoveDirection::Right => (
+                offset_x,
+                Rect::new(x_int, from_rect.y, from_rect.width, from_rect.height),
+            ),
+        };
+
+        tile.with_offset(direction, offset).render(rect, buf);
     }
 
     fn render_clearing(&self, tile: &Tile, at_rect: Rect, buf: &mut Buffer) {
