@@ -31,7 +31,7 @@ pub struct Grid {
 }
 
 #[derive(Clone, Copy)]
-pub enum MoveDirection {
+pub enum MoveDir {
     Up,
     Down,
     Left,
@@ -78,33 +78,33 @@ impl Grid {
         self.active_animations.is_empty()
     }
 
-    pub fn move_grid(&mut self, direction: MoveDirection) {
+    pub fn move_grid(&mut self, direction: MoveDir) {
         if self.steps == 0 {
             return;
         }
         match direction {
-            MoveDirection::Left => {
+            MoveDir::Left => {
                 for dx in 0..self.get_width() {
                     for dy in 0..self.get_height() {
                         self.move_tile(dy, dx, direction);
                     }
                 }
             }
-            MoveDirection::Right => {
+            MoveDir::Right => {
                 for dx in (0..self.get_width()).rev() {
                     for dy in 0..self.get_height() {
                         self.move_tile(dy, dx, direction);
                     }
                 }
             }
-            MoveDirection::Up => {
+            MoveDir::Up => {
                 for dy in 0..self.get_height() {
                     for dx in 0..self.get_width() {
                         self.move_tile(dy, dx, direction);
                     }
                 }
             }
-            MoveDirection::Down => {
+            MoveDir::Down => {
                 for dy in (0..self.get_height()).rev() {
                     for dx in 0..self.get_width() {
                         self.move_tile(dy, dx, direction);
@@ -116,12 +116,12 @@ impl Grid {
         self.steps = self.steps.saturating_sub(1);
     }
 
-    fn move_tile(&mut self, y: usize, x: usize, direction: MoveDirection) {
+    fn move_tile(&mut self, y: usize, x: usize, direction: MoveDir) {
         let (ty, tx) = match direction {
-            MoveDirection::Left => (y, x.wrapping_sub(1)), // (y, x - 1)
-            MoveDirection::Right => (y, x.wrapping_add(1)), // (y, x + 1)
-            MoveDirection::Up => (y.wrapping_sub(1), x),   // (y - 1, x)
-            MoveDirection::Down => (y.wrapping_add(1), x), // (y + 1, x)
+            MoveDir::Left => (y, x.wrapping_sub(1)),  // (y, x - 1)
+            MoveDir::Right => (y, x.wrapping_add(1)), // (y, x + 1)
+            MoveDir::Up => (y.wrapping_sub(1), x),    // (y - 1, x)
+            MoveDir::Down => (y.wrapping_add(1), x),  // (y + 1, x)
         };
 
         let from = self.data.get((y, x)).unwrap();
@@ -185,8 +185,7 @@ impl Grid {
 
             let neighbors = [(x + 1, y, index + 1), (x, y + 1, index + width)]; // Right, Down
             for (nx, ny, n_index) in neighbors {
-                if matches!(&self.data.get((ny, nx)), Some(Tile::Regular { color: c, .. }) if c == color)
-                {
+                if matches!(&self.data.get((ny, nx)), Some(Tile::Regular { color: c, .. }) if c == color) {
                     uf.union(index, n_index);
                 }
             }

@@ -16,7 +16,7 @@ use ratatui::{
 };
 
 use crate::{
-    grid::{Grid, MoveDirection},
+    grid::{Grid, MoveDir},
     timer::Timer,
 };
 
@@ -42,7 +42,7 @@ fn main() -> Result<()> {
 
 struct App {
     grid: Grid,
-    input_queue: VecDeque<MoveDirection>,
+    input_queue: VecDeque<MoveDir>,
     exit: bool,
 }
 
@@ -94,11 +94,11 @@ impl App {
             _ => {}
         };
         if self.input_queue.len() <= 2 {
-            let input: Option<MoveDirection> = match (key.code, key.modifiers) {
-                (KeyCode::Left, _) => Some(MoveDirection::Left),
-                (KeyCode::Right, _) => Some(MoveDirection::Right),
-                (KeyCode::Up, _) => Some(MoveDirection::Up),
-                (KeyCode::Down, _) => Some(MoveDirection::Down),
+            let input: Option<MoveDir> = match (key.code, key.modifiers) {
+                (KeyCode::Left, _) => Some(MoveDir::Left),
+                (KeyCode::Right, _) => Some(MoveDir::Right),
+                (KeyCode::Up, _) => Some(MoveDir::Up),
+                (KeyCode::Down, _) => Some(MoveDir::Down),
                 _ => None,
             };
             self.input_queue.extend(input);

@@ -1,10 +1,11 @@
-use super::{Animation, Tile, grid_layout::GridLayout};
 use ndarray::ArrayView2;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
     widgets::Widget,
 };
+
+use crate::grid::{animation::Animation, grid_layout::GridLayout, tile::Tile};
 
 pub struct GridWidget<'a> {
     pub tiles: ArrayView2<'a, Tile>,
@@ -47,12 +48,18 @@ impl<'a> Widget for GridWidget<'a> {
                 .split(*row_rect);
 
             for (x, tile_rect) in col_rects.iter().enumerate() {
-                rect_lookup.push(*tile_rect);
+                let tile_rect = Rect::new(
+                    tile_rect.x,
+                    tile_rect.y,
+                    tile_rect.width.saturating_sub(2),
+                    tile_rect.height.saturating_sub(1),
+                );
 
+                rect_lookup.push(tile_rect);
                 if self.animation_mask[[y, x]] {
-                    Tile::Empty.render(*tile_rect, buf);
+                    Tile::Empty.render(tile_rect, buf);
                 } else {
-                    self.tiles[[y, x]].render(*tile_rect, buf);
+                    self.tiles[[y, x]].render(tile_rect, buf);
                 }
             }
         }
@@ -60,9 +67,7 @@ impl<'a> Widget for GridWidget<'a> {
         let layout = &GridLayout::new(rect_lookup, width);
 
         for animation in self.animations {
-            animation
-                .with_layout(layout)
-                .render(Default::default(), buf);
+            animation.with_layout(layout).render(Default::default(), buf);
         }
     }
 }
