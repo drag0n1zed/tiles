@@ -3,9 +3,10 @@
 > [!NOTE]
 > Inspired by *Color Tiles*.
 
-https://github.com/user-attachments/assets/56c3829e-f352-44c1-8153-77d44cbac512
+## Next milestone:
+![Next milestone](assets/next_step.png)
 
-TODO:
+## TODO:
 - Game
   - [x] 4+ connected tiles disappear
     - [x] Disappear animation
@@ -18,6 +19,7 @@ TODO:
     - [x] Tile color
     - [x] Tile textures
     - [x] Move animation
+  - [ ] Main Menu
   - [ ] Import / export save in TUI
     - [ ] Choose save in command line
   - [ ] Edit mode: hjkl / arrow keys to select tile, r (replace) / enter to change tile
