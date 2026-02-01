@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use ndarray::ArrayView2;
 use ratatui::{
     buffer::Buffer,
@@ -10,7 +12,6 @@ use crate::grid::{animation::Animation, grid_layout::GridLayout, tile::Tile};
 pub struct GridWidget<'a> {
     pub tiles: ArrayView2<'a, Tile>,
     pub animations: &'a [Animation],
-    pub animation_mask: ArrayView2<'a, bool>,
 }
 
 impl<'a> Widget for GridWidget<'a> {
@@ -31,15 +32,20 @@ impl<'a> Widget for GridWidget<'a> {
             Rect::new(start_x, start_y, new_rect_w, new_rect_h)
         };
 
+        let mut rect_lookup = Vec::with_capacity(height * width);
+        let anim_mask: HashSet<usize> = self
+            .animations
+            .iter()
+            .flat_map(|anim| anim.get_coords())
+            .map(|(y, x)| y * width + x)
+            .collect();
+
         let row_constraints = vec![Constraint::Ratio(1, height as u32); height];
         let col_constraints = vec![Constraint::Ratio(1, width as u32); width];
-
         let row_rects = Layout::default()
             .direction(Direction::Vertical)
             .constraints(row_constraints)
             .split(grid_rect);
-
-        let mut rect_lookup = Vec::with_capacity(height * width);
 
         for (y, row_rect) in row_rects.iter().enumerate() {
             let col_rects = Layout::default()
@@ -56,7 +62,7 @@ impl<'a> Widget for GridWidget<'a> {
                 );
 
                 rect_lookup.push(tile_rect);
-                if self.animation_mask[[y, x]] {
+                if anim_mask.contains(&(y * width + x)) {
                     Tile::Empty.render(tile_rect, buf);
                 } else {
                     self.tiles[[y, x]].render(tile_rect, buf);

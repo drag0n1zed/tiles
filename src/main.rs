@@ -25,12 +25,7 @@ fn main() -> Result<()> {
     // Import save file
     let grid = Grid::from_ron(fs::read_to_string("grid.ron")?.as_str())?;
 
-    let grid = ratatui::run(|terminal| {
-        let mut app = App::from_grid(grid);
-        app.run(terminal)?;
-        let result: Result<Grid> = Ok(app.into_grid());
-        result
-    })?;
+    let grid = ratatui::run(|terminal| -> Result<Grid> { App::from_grid(grid).run(terminal) })?;
 
     // Export save file
     if false {
@@ -59,7 +54,7 @@ impl App {
         self.grid
     }
 
-    fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
+    fn run(mut self, terminal: &mut DefaultTerminal) -> Result<Grid> {
         let mut game_tick_timer = Timer::new(Duration::from_millis(8));
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
@@ -81,7 +76,7 @@ impl App {
                 }
             }
         }
-        Ok(())
+        Ok(self.grid)
     }
 
     fn draw(&self, frame: &mut Frame) {

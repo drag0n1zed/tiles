@@ -13,12 +13,7 @@ pub struct VecGrid {
 
 impl From<Grid> for VecGrid {
     fn from(grid: Grid) -> Self {
-        let array = grid
-            .data
-            .rows()
-            .into_iter()
-            .map(|chunk| chunk.to_vec())
-            .collect();
+        let array = grid.data.rows().into_iter().map(|chunk| chunk.to_vec()).collect();
 
         VecGrid {
             steps: grid.steps,
@@ -36,7 +31,6 @@ impl From<VecGrid> for Grid {
             data: Array2::from_shape_vec((vec_grid.height, vec_grid.width), vec_flat).unwrap(),
             steps: vec_grid.steps,
             active_animations: Vec::new(),
-            animation_mask: Array2::from_elem((vec_grid.height, vec_grid.width), false),
             pending_pop: false,
         }
     }

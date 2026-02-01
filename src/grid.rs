@@ -25,8 +25,6 @@ pub struct Grid {
     #[serde(skip)]
     pub active_animations: Vec<Animation>,
     #[serde(skip)]
-    animation_mask: Array2<bool>,
-    #[serde(skip)]
     pending_pop: bool,
 }
 
@@ -44,7 +42,6 @@ impl Grid {
             data: Array2::from_elem((length, width), Tile::Empty),
             steps,
             active_animations: Vec::new(),
-            animation_mask: Array2::from_elem((length, width), false),
             pending_pop: false,
         }
     }
@@ -62,7 +59,6 @@ impl Grid {
         GridWidget {
             tiles: self.data.view(),
             animations: &self.active_animations,
-            animation_mask: self.animation_mask.view(),
         }
     }
 
@@ -78,45 +74,52 @@ impl Grid {
         self.active_animations.is_empty()
     }
 
-    pub fn move_grid(&mut self, direction: MoveDir) {
+    // Returns true if move happened, false if no move happened
+    pub fn move_grid(&mut self, direction: MoveDir) -> bool {
         if self.steps == 0 {
-            return;
+            return false;
         }
+        let mut moved = false;
         match direction {
             MoveDir::Left => {
                 for dx in 0..self.get_width() {
                     for dy in 0..self.get_height() {
-                        self.move_tile(dy, dx, direction);
+                        moved |= self.move_tile(dy, dx, direction);
                     }
                 }
             }
             MoveDir::Right => {
                 for dx in (0..self.get_width()).rev() {
                     for dy in 0..self.get_height() {
-                        self.move_tile(dy, dx, direction);
+                        moved |= self.move_tile(dy, dx, direction);
                     }
                 }
             }
             MoveDir::Up => {
                 for dy in 0..self.get_height() {
                     for dx in 0..self.get_width() {
-                        self.move_tile(dy, dx, direction);
+                        moved |= self.move_tile(dy, dx, direction);
                     }
                 }
             }
             MoveDir::Down => {
                 for dy in (0..self.get_height()).rev() {
                     for dx in 0..self.get_width() {
-                        self.move_tile(dy, dx, direction);
+                        moved |= self.move_tile(dy, dx, direction);
                     }
                 }
             }
         };
-
-        self.steps = self.steps.saturating_sub(1);
+        if moved {
+            self.steps = self.steps.saturating_sub(1);
+            true
+        } else {
+            false
+        }
     }
 
-    fn move_tile(&mut self, y: usize, x: usize, direction: MoveDir) {
+    // Returns true if tile moved, false if tile did not move
+    fn move_tile(&mut self, y: usize, x: usize, direction: MoveDir) -> bool {
         let (ty, tx) = match direction {
             MoveDir::Left => (y, x.wrapping_sub(1)),  // (y, x - 1)
             MoveDir::Right => (y, x.wrapping_add(1)), // (y, x + 1)
@@ -127,7 +130,7 @@ impl Grid {
         let from = self.data.get((y, x)).unwrap();
         let Some(to) = self.data.get((ty, tx)) else {
             // Hit the wall
-            return;
+            return false;
         };
 
         // Target is regular or blocker tile: cannot move
@@ -139,10 +142,11 @@ impl Grid {
                 direction,
                 start_time: Instant::now(),
             });
-            self.animation_mask[[y, x]] = true;
-            self.animation_mask[[ty, tx]] = true;
             self.data.swap((y, x), (ty, tx));
             self.pending_pop = true;
+            true
+        } else {
+            false
         }
     }
 
@@ -157,21 +161,6 @@ impl Grid {
 
     fn clear_completed_animations(&mut self) {
         self.active_animations.retain(|anim| anim.is_active());
-
-        self.animation_mask.fill(false);
-
-        for anim in &self.active_animations {
-            match anim {
-                Animation::Moving { from, .. } => {
-                    let to = anim.get_target().unwrap();
-                    self.animation_mask[*from] = true;
-                    self.animation_mask[to] = true;
-                }
-                Animation::Clearing { at, .. } => {
-                    self.animation_mask[*at] = true;
-                }
-            }
-        }
     }
 
     fn pop_connected_tiles(&mut self) {
@@ -204,7 +193,6 @@ impl Grid {
                     at: (y, x),
                     start_time: Instant::now(),
                 });
-                self.animation_mask[[y, x]] = true;
 
                 *tile = Tile::Empty;
             }

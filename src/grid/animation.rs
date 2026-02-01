@@ -1,5 +1,8 @@
 use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashSet,
+    time::{Duration, Instant},
+};
 
 use crate::grid::{MoveDir, grid_layout::GridLayout, tile::Tile};
 
@@ -79,6 +82,14 @@ impl Animation {
 
     pub fn is_active(&self) -> bool {
         Instant::now() - self.get_start_time() < self.duration()
+    }
+
+    pub fn get_coords(&self) -> HashSet<(usize, usize)> {
+        match &self {
+            Animation::Moving { from: coord, .. } | Animation::Clearing { at: coord, .. } => {
+                [Some(*coord), self.get_target()].into_iter().flatten().collect()
+            }
+        }
     }
 
     fn get_start_time(&self) -> Instant {
