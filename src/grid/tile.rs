@@ -25,7 +25,7 @@ impl Widget for &Tile {
     fn render(self, rect: Rect, buf: &mut Buffer) {
         match self {
             Tile::Empty => {
-                buf.set_style(rect, Style::default().bg(Color::Black));
+                buf.set_style(rect, Style::default().bg(Color::DarkGray));
             }
             Tile::Blocker => {
                 /*

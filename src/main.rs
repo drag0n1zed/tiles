@@ -9,7 +9,7 @@ use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Style, Styled, Stylize},
+    style::Stylize,
     symbols::border,
     text::{Line, Span},
     widgets::{Block, Widget},
@@ -50,11 +50,9 @@ impl App {
         }
     }
 
-    fn into_grid(self) -> Grid {
-        self.grid
-    }
-
     fn run(mut self, terminal: &mut DefaultTerminal) -> Result<Grid> {
+        terminal.clear()?;
+
         let mut game_tick_timer = Timer::new(Duration::from_millis(8));
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
@@ -118,8 +116,7 @@ impl Widget for &App {
         let block = Block::bordered()
             .title(header)
             .border_set(border::THICK)
-            .title_bottom(footer.centered())
-            .set_style(Style::default().bg(Color::Reset));
+            .title_bottom(footer.centered());
 
         let inner_rect = block.inner(rect);
         let inner_rect_with_margin = Rect::new(
