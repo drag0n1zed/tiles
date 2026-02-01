@@ -4,7 +4,7 @@ mod timer;
 use std::{collections::VecDeque, fs, time::Duration};
 
 use color_eyre::eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
