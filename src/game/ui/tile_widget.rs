@@ -1,25 +1,11 @@
-mod clearing;
-mod moving;
-
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
     style::{Color, Style},
     widgets::Widget,
 };
-use serde::{Deserialize, Serialize};
-use uid::Id;
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
-pub enum Tile {
-    Empty,
-    Blocker,
-    Regular {
-        #[serde(skip)]
-        id: Id<Tile>,
-        color: Color,
-    },
-}
+use crate::game::logic::grid::tile::Tile;
 
 impl Widget for &Tile {
     fn render(self, rect: Rect, buf: &mut Buffer) {

@@ -1,7 +1,5 @@
-mod animation;
-mod grid_layout;
-mod grid_widget;
-mod tile;
+pub mod anim;
+pub mod tile;
 mod vec_grid;
 
 use std::time::Instant;
@@ -12,8 +10,7 @@ use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use union_find::{QuickUnionUf, UnionBySize, UnionFind};
 
-use animation::Animation;
-use grid_widget::GridWidget;
+use anim::Animation;
 use tile::Tile;
 use vec_grid::VecGrid;
 
@@ -21,11 +18,11 @@ use vec_grid::VecGrid;
 #[serde(into = "VecGrid", from = "VecGrid")]
 pub struct Grid {
     pub steps: usize,
-    pub data: Array2<Tile>,
+    pub tiles: Array2<Tile>,
     #[serde(skip)]
     pub active_animations: Vec<Animation>,
     #[serde(skip)]
-    pending_pop: bool,
+    pub pending_pop: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -39,7 +36,7 @@ pub enum MoveDir {
 impl Grid {
     pub fn new(length: usize, width: usize, steps: usize) -> Self {
         Self {
-            data: Array2::from_elem((length, width), Tile::Empty),
+            tiles: Array2::from_elem((length, width), Tile::Empty),
             steps,
             active_animations: Vec::new(),
             pending_pop: false,
@@ -55,19 +52,20 @@ impl Grid {
         Ok(ron::de::from_str(ron)?)
     }
 
-    pub fn as_widget(&self) -> GridWidget<'_> {
-        GridWidget {
-            tiles: self.data.view(),
-            animations: &self.active_animations,
-        }
-    }
-
     pub fn get_height(&self) -> usize {
-        self.data.dim().0
+        self.tiles.dim().0
     }
 
     pub fn get_width(&self) -> usize {
-        self.data.dim().1
+        self.tiles.dim().1
+    }
+
+    pub fn get_tiles_view(&self) -> ArrayView2<'_, Tile> {
+        self.tiles.view()
+    }
+
+    pub fn get_anims_slice(&self) -> &[Animation] {
+        &self.active_animations
     }
 
     pub fn is_anim_completed(&self) -> bool {
@@ -127,8 +125,8 @@ impl Grid {
             MoveDir::Down => (y.wrapping_add(1), x),  // (y + 1, x)
         };
 
-        let from = self.data.get((y, x)).unwrap();
-        let Some(to) = self.data.get((ty, tx)) else {
+        let from = self.tiles.get((y, x)).unwrap();
+        let Some(to) = self.tiles.get((ty, tx)) else {
             // Hit the wall
             return false;
         };
@@ -142,7 +140,7 @@ impl Grid {
                 direction,
                 start_time: Instant::now(),
             });
-            self.data.swap((y, x), (ty, tx));
+            self.tiles.swap((y, x), (ty, tx));
             self.pending_pop = true;
             true
         } else {
@@ -166,7 +164,7 @@ impl Grid {
     fn pop_connected_tiles(&mut self) {
         let (length, width) = (self.get_height(), self.get_width());
         let mut uf = QuickUnionUf::<UnionBySize>::new(length * width);
-        for ((y, x), tile) in self.data.indexed_iter() {
+        for ((y, x), tile) in self.tiles.indexed_iter() {
             let Tile::Regular { color, .. } = tile else {
                 continue;
             };
@@ -174,13 +172,13 @@ impl Grid {
 
             let neighbors = [(x + 1, y, index + 1), (x, y + 1, index + width)]; // Right, Down
             for (nx, ny, n_index) in neighbors {
-                if matches!(&self.data.get((ny, nx)), Some(Tile::Regular { color: c, .. }) if c == color) {
+                if matches!(&self.tiles.get((ny, nx)), Some(Tile::Regular { color: c, .. }) if c == color) {
                     uf.union(index, n_index);
                 }
             }
         }
 
-        for ((y, x), tile) in self.data.indexed_iter_mut() {
+        for ((y, x), tile) in self.tiles.indexed_iter_mut() {
             let Tile::Regular { .. } = tile else {
                 continue;
             };

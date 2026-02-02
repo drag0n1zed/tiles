@@ -4,18 +4,18 @@ use ratatui::{
     widgets::Widget,
 };
 
-use crate::grid::tile::Tile;
-
-impl Tile {
-    pub fn with_clearing_progress(&self, at: Rect, t: f64) -> ClearingTile<'_> {
-        ClearingTile { tile: self, at, t }
-    }
-}
+use crate::game::logic::grid::tile::Tile;
 
 pub struct ClearingTile<'a> {
     tile: &'a Tile,
     at: Rect,
     t: f64,
+}
+
+impl<'a> ClearingTile<'a> {
+    pub fn new(tile: &'a Tile, at: Rect, t: f64) -> Self {
+        Self { tile, at, t }
+    }
 }
 
 impl<'a> Widget for ClearingTile<'a> {

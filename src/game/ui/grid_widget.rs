@@ -7,15 +7,28 @@ use ratatui::{
     widgets::Widget,
 };
 
-use crate::grid::{animation::Animation, grid_layout::GridLayout, tile::Tile};
+use crate::game::{
+    logic::grid::{Grid, anim::Animation, tile::Tile},
+    ui::{anim_widgets::AnimationWidget, grid_layout::GridLayout},
+};
 
 pub struct GridWidget<'a> {
-    pub tiles: ArrayView2<'a, Tile>,
-    pub animations: &'a [Animation],
+    tiles: ArrayView2<'a, Tile>,
+    anim: &'a [Animation],
+}
+
+impl<'a> GridWidget<'a> {
+    pub fn new(grid: &'a Grid) -> Self {
+        Self {
+            tiles: grid.get_tiles_view(),
+            anim: grid.get_anims_slice(),
+        }
+    }
 }
 
 impl<'a> Widget for GridWidget<'a> {
     fn render(self, rect: Rect, buf: &mut Buffer) {
+        let rect = Rect::new(rect.x + 2, rect.y + 1, rect.width - 2, rect.height - 1);
         let (height, width) = self.tiles.dim();
 
         let grid_rect = {
@@ -34,7 +47,7 @@ impl<'a> Widget for GridWidget<'a> {
 
         let mut rect_lookup = Vec::with_capacity(height * width);
         let anim_mask: HashSet<usize> = self
-            .animations
+            .anim
             .iter()
             .flat_map(|anim| anim.get_coords())
             .map(|(y, x)| y * width + x)
@@ -72,8 +85,8 @@ impl<'a> Widget for GridWidget<'a> {
 
         let layout = &GridLayout::new(rect_lookup, width);
 
-        for animation in self.animations {
-            animation.with_layout(layout).render(Default::default(), buf);
+        for animation in self.anim {
+            AnimationWidget::new(animation, layout).render(Default::default(), buf);
         }
     }
 }

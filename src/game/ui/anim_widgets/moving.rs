@@ -5,19 +5,7 @@ use ratatui::{
     widgets::Widget,
 };
 
-use crate::grid::{MoveDir, tile::Tile};
-
-impl Tile {
-    pub fn with_moving_progress(&self, from: Rect, to: Rect, dir: MoveDir, t: f64) -> MovingTile<'_> {
-        MovingTile {
-            tile: self,
-            from,
-            to,
-            dir,
-            t,
-        }
-    }
-}
+use crate::game::logic::grid::{MoveDir, tile::Tile};
 
 pub struct MovingTile<'a> {
     tile: &'a Tile,
@@ -25,6 +13,12 @@ pub struct MovingTile<'a> {
     to: Rect,
     dir: MoveDir,
     t: f64,
+}
+
+impl<'a> MovingTile<'a> {
+    pub fn new(tile: &'a Tile, from: Rect, to: Rect, dir: MoveDir, t: f64) -> Self {
+        Self { tile, from, to, dir, t }
+    }
 }
 
 impl<'a> Widget for MovingTile<'a> {

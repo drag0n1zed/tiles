@@ -1,22 +1,16 @@
-mod grid;
+mod game;
+mod screens;
 mod timer;
 
-use std::{collections::VecDeque, fs, time::Duration};
+use std::{fs, time::Duration};
 
 use color_eyre::eyre::Result;
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyModifiers};
-use ratatui::{
-    DefaultTerminal, Frame,
-    buffer::Buffer,
-    layout::Rect,
-    style::Stylize,
-    symbols::border,
-    text::{Line, Span},
-    widgets::{Block, Widget},
-};
+use ratatui::DefaultTerminal;
+use ratatui::crossterm::event;
 
 use crate::{
-    grid::{Grid, MoveDir},
+    game::logic::grid::Grid,
+    screens::{Screen, ScreenAction, game_screen::GameScreen},
     timer::Timer,
 };
 
@@ -25,109 +19,44 @@ fn main() -> Result<()> {
     // Import save file
     let grid = Grid::from_ron(fs::read_to_string("grid.ron")?.as_str())?;
 
-    let grid = ratatui::run(|terminal| -> Result<Grid> { App::from_grid(grid).run(terminal) })?;
-
-    // Export save file
-    if false {
-        fs::write("grid.ron", grid.to_ron())?;
-    }
+    ratatui::run(|terminal| -> Result<()> { App::from_grid(grid).run(terminal) })?;
 
     Ok(())
 }
 
 struct App {
-    grid: Grid,
-    input_queue: VecDeque<MoveDir>,
+    current_screen: Box<dyn Screen>,
+    tick_timer: Timer,
     exit: bool,
 }
 
 impl App {
     fn from_grid(grid: Grid) -> Self {
         Self {
-            grid,
-            input_queue: VecDeque::new(),
+            current_screen: Box::new(GameScreen::from_grid(grid)),
+            tick_timer: Timer::new(Duration::from_secs_f64(1.0 / 120.0)), // 120 TPS/FPS
             exit: false,
         }
     }
 
-    fn run(mut self, terminal: &mut DefaultTerminal) -> Result<Grid> {
+    fn run(mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         terminal.clear()?;
 
-        let mut game_tick_timer = Timer::new(Duration::from_millis(8));
         while !self.exit {
-            terminal.draw(|frame| self.draw(frame))?;
+            terminal.draw(|frame| self.current_screen.render_screen(frame))?;
 
-            if event::poll(game_tick_timer.time_until_ready())? {
-                if let Event::Key(key) = event::read()? {
-                    self.handle_key_press(key);
+            if event::poll(self.tick_timer.time_until_ready())? {
+                while event::poll(Duration::ZERO)? {
+                    self.current_screen.handle_input(event::read()?);
                 }
             }
 
-            // Execute every tick:
-            if game_tick_timer.ready() {
-                self.grid.update_anim_state();
-
-                if self.grid.is_anim_completed()
-                    && let Some(input) = self.input_queue.pop_front()
-                {
-                    self.grid.move_grid(input);
-                }
+            match self.current_screen.update() {
+                ScreenAction::Quit => self.exit = true,
+                ScreenAction::ChangeScreen(screen) => self.current_screen = screen,
+                _ => {}
             }
         }
-        Ok(self.grid)
-    }
-
-    fn draw(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.area());
-    }
-
-    fn handle_key_press(&mut self, key: event::KeyEvent) {
-        match (key.code, key.modifiers) {
-            (KeyCode::Esc, _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => self.exit = true,
-            _ => {}
-        };
-        if self.input_queue.len() <= 2 {
-            let input: Option<MoveDir> = match (key.code, key.modifiers) {
-                (KeyCode::Left, _) => Some(MoveDir::Left),
-                (KeyCode::Right, _) => Some(MoveDir::Right),
-                (KeyCode::Up, _) => Some(MoveDir::Up),
-                (KeyCode::Down, _) => Some(MoveDir::Down),
-                _ => None,
-            };
-            self.input_queue.extend(input);
-        }
-    }
-}
-
-impl Widget for &App {
-    fn render(self, rect: Rect, buf: &mut Buffer) {
-        let header = Line::from(" TILES ".bold());
-
-        let footer = {
-            let spans = vec![
-                Span::raw(" "),
-                Span::raw(self.grid.steps.to_string()).bold(),
-                Span::raw(" moves remaining "),
-            ];
-
-            Line::from(spans)
-        };
-
-        let block = Block::bordered()
-            .title(header)
-            .border_set(border::THICK)
-            .title_bottom(footer.centered());
-
-        let inner_rect = block.inner(rect);
-        let inner_rect_with_margin = Rect::new(
-            inner_rect.x + 2,
-            inner_rect.y + 1,
-            inner_rect.width - 2,
-            inner_rect.height - 1,
-        );
-
-        block.render(rect, buf);
-
-        self.grid.as_widget().render(inner_rect_with_margin, buf);
+        Ok(())
     }
 }
