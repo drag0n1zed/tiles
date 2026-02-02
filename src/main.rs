@@ -5,12 +5,12 @@ mod timer;
 use std::{fs, time::Duration};
 
 use color_eyre::eyre::Result;
-use ratatui::DefaultTerminal;
-use ratatui::crossterm::event;
+use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
+use ratatui::{DefaultTerminal, crossterm::event::Event};
 
 use crate::{
     game::logic::grid::Grid,
-    screens::{Screen, ScreenAction, game_screen::GameScreen},
+    screens::{Screen, ScreenAction, menu_screen::MenuScreen},
     timer::Timer,
 };
 
@@ -33,7 +33,7 @@ struct App {
 impl App {
     fn from_grid(grid: Grid) -> Self {
         Self {
-            current_screen: Box::new(GameScreen::from_grid(grid)),
+            current_screen: Box::new(MenuScreen::new()),
             tick_timer: Timer::new(Duration::from_secs_f64(1.0 / 120.0)), // 120 TPS/FPS
             exit: false,
         }
@@ -47,7 +47,16 @@ impl App {
 
             if event::poll(self.tick_timer.time_until_ready())? {
                 while event::poll(Duration::ZERO)? {
-                    self.current_screen.handle_input(event::read()?);
+                    let event = event::read()?;
+                    if let Event::Key(KeyEvent { code, modifiers, .. }) = event {
+                        match (code, modifiers) {
+                            (KeyCode::Esc, _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+                                self.exit = true;
+                            }
+                            _ => {}
+                        }
+                    }
+                    self.current_screen.handle_input(event);
                 }
             }
 

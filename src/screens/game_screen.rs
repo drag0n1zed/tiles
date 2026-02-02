@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use ratatui::crossterm::event::{Event, KeyCode, KeyModifiers};
+use ratatui::crossterm::event::{Event, KeyCode};
 use ratatui::prelude::*;
 use ratatui::symbols::border;
 use ratatui::widgets::Block;
@@ -33,13 +33,6 @@ impl Screen for GameScreen {
     fn handle_input(&mut self, event: Event) {
         let Event::Key(key) = event else {
             return;
-        };
-        match (key.code, key.modifiers) {
-            (KeyCode::Esc, _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                self.exit = true;
-                return;
-            }
-            _ => {}
         };
         if self.input_queue.len() <= 2 {
             let input: Option<MoveDir> = match (key.code, key.modifiers) {

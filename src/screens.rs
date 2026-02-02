@@ -1,13 +1,17 @@
 pub mod game_screen;
+pub mod menu_screen;
 
 use ratatui::crossterm::event::Event;
 use ratatui::prelude::*;
 
+#[derive(Default)]
 pub enum ScreenAction {
+    #[default]
     Nothing,
     Quit,
     ChangeScreen(Box<dyn Screen>),
 }
+
 pub trait Screen {
     fn handle_input(&mut self, event: Event);
     fn update(&mut self) -> ScreenAction;
