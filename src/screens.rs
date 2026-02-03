@@ -8,12 +8,11 @@ use ratatui::prelude::*;
 pub enum ScreenAction {
     #[default]
     Nothing,
-    Quit,
     ChangeScreen(Box<dyn Screen>),
 }
 
 pub trait Screen {
-    fn handle_input(&mut self, event: Event);
+    fn handle_input(&mut self, event: Event) -> ScreenAction;
     fn update(&mut self) -> ScreenAction;
     fn render_screen(&self, frame: &mut Frame);
 }

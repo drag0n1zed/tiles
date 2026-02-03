@@ -2,24 +2,21 @@ mod game;
 mod screens;
 mod timer;
 
-use std::{fs, time::Duration};
+use std::time::Duration;
 
 use color_eyre::eyre::Result;
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{DefaultTerminal, crossterm::event::Event};
 
 use crate::{
-    game::logic::grid::Grid,
     screens::{Screen, ScreenAction, menu_screen::MenuScreen},
     timer::Timer,
 };
 
 fn main() -> Result<()> {
     color_eyre::install()?;
-    // Import save file
-    let grid = Grid::from_ron(fs::read_to_string("grid.ron")?.as_str())?;
 
-    ratatui::run(|terminal| -> Result<()> { App::from_grid(grid).run(terminal) })?;
+    ratatui::run(|terminal| -> Result<()> { App::new().run(terminal) })?;
 
     Ok(())
 }
@@ -31,7 +28,7 @@ struct App {
 }
 
 impl App {
-    fn from_grid(grid: Grid) -> Self {
+    fn new() -> Self {
         Self {
             current_screen: Box::new(MenuScreen::new()),
             tick_timer: Timer::new(Duration::from_secs_f64(1.0 / 120.0)), // 120 TPS/FPS
@@ -56,16 +53,21 @@ impl App {
                             _ => {}
                         }
                     }
-                    self.current_screen.handle_input(event);
+                    let action = self.current_screen.handle_input(event);
+                    self.handle_action(action);
                 }
             }
 
-            match self.current_screen.update() {
-                ScreenAction::Quit => self.exit = true,
-                ScreenAction::ChangeScreen(screen) => self.current_screen = screen,
-                _ => {}
-            }
+            let action = self.current_screen.update();
+            self.handle_action(action);
         }
         Ok(())
+    }
+
+    fn handle_action(&mut self, action: ScreenAction) {
+        match action {
+            ScreenAction::ChangeScreen(screen) => self.current_screen = screen,
+            _ => {}
+        }
     }
 }

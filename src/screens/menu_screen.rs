@@ -1,3 +1,5 @@
+use std::fs;
+
 use ratatui::{
     Frame,
     buffer::Buffer,
@@ -6,45 +8,46 @@ use ratatui::{
     style::{Color, Style},
     symbols::border,
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Clear, Paragraph, Widget},
+    widgets::{Block, Clear, Paragraph, Widget},
 };
 
-use crate::screens::{Screen, ScreenAction};
+use crate::{
+    game::logic::grid::Grid,
+    screens::{Screen, ScreenAction, game_screen::GameScreen},
+};
 
-pub struct MenuScreen {
-    pending_action: ScreenAction,
-}
+pub struct MenuScreen;
 
 impl MenuScreen {
     pub fn new() -> Self {
-        Self {
-            pending_action: ScreenAction::Nothing,
-        }
+        Self {}
     }
 }
 
 impl Screen for MenuScreen {
-    fn handle_input(&mut self, event: Event) {
-        if let Event::Key(key) = event {
-            match key.code {
-                KeyCode::Char('n') | KeyCode::Char('N') => {
-                    println!("Action: New Game");
-                    // self.pending_action = ScreenAction::NewGame;
-                }
-                KeyCode::Char('r') | KeyCode::Char('R') => {
-                    println!("Action: Resume");
-                    // self.pending_action = ScreenAction::Resume;
-                }
-                KeyCode::Char('c') | KeyCode::Char('C') => {
-                    println!("Action: Challenge Mode");
-                    // self.pending_action = ScreenAction::Challenge;
-                }
-                KeyCode::Char('e') | KeyCode::Char('E') => {
-                    println!("Action: Editor");
-                    // self.pending_action = ScreenAction::Editor;
-                }
-                _ => {}
+    fn handle_input(&mut self, event: Event) -> ScreenAction {
+        let Event::Key(key) = event else {
+            return ScreenAction::Nothing;
+        };
+        match key.code {
+            KeyCode::Char('l') | KeyCode::Char('L') => {
+                // TODO: open file picker and pick a .ron file
+                ScreenAction::Nothing
             }
+            KeyCode::Char('r') | KeyCode::Char('R') => {
+                // TODO: resume last played game
+                let grid = Grid::from_ron(fs::read_to_string("grid.ron").unwrap().as_str()).unwrap();
+                ScreenAction::ChangeScreen(Box::new(GameScreen::from_grid(grid)))
+            }
+            KeyCode::Char('c') | KeyCode::Char('C') => {
+                // TODO: 20-level challenge mode
+                ScreenAction::Nothing
+            }
+            KeyCode::Char('e') | KeyCode::Char('E') => {
+                // TODO: Editor mode
+                ScreenAction::Nothing
+            }
+            _ => ScreenAction::Nothing,
         }
     }
 
@@ -53,7 +56,7 @@ impl Screen for MenuScreen {
     }
 
     fn update(&mut self) -> ScreenAction {
-        std::mem::take(&mut self.pending_action)
+        ScreenAction::Nothing
     }
 }
 
@@ -116,8 +119,8 @@ impl Widget for &MenuScreen {
         ];
         let options = vec![
             Line::from(vec![
-                Span::styled("(N)", Style::default().fg(Color::Yellow).bold()),
-                Span::raw("ew Game"),
+                Span::styled("(L)", Style::default().fg(Color::Yellow).bold()),
+                Span::raw("oad Level"),
             ]),
             Line::from(vec![
                 Span::styled("(R)", Style::default().fg(Color::Yellow).bold()),

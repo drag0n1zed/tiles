@@ -16,7 +16,6 @@ use crate::{
 pub struct GameScreen {
     grid: Grid,
     input_queue: VecDeque<MoveDir>,
-    exit: bool,
 }
 
 impl GameScreen {
@@ -24,15 +23,14 @@ impl GameScreen {
         GameScreen {
             grid,
             input_queue: VecDeque::new(),
-            exit: false,
         }
     }
 }
 
 impl Screen for GameScreen {
-    fn handle_input(&mut self, event: Event) {
+    fn handle_input(&mut self, event: Event) -> ScreenAction {
         let Event::Key(key) = event else {
-            return;
+            return ScreenAction::Nothing;
         };
         if self.input_queue.len() <= 2 {
             let input: Option<MoveDir> = match (key.code, key.modifiers) {
@@ -44,13 +42,10 @@ impl Screen for GameScreen {
             };
             self.input_queue.extend(input);
         };
+        ScreenAction::Nothing
     }
 
     fn update(&mut self) -> ScreenAction {
-        if self.exit {
-            return ScreenAction::Quit;
-        }
-
         self.grid.update_anim_state();
 
         if self.grid.is_anim_completed()
