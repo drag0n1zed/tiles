@@ -161,26 +161,13 @@ impl Widget for &MenuScreen {
         Clear.render(union_rect, buf);
         Block::bordered().border_set(border::PLAIN).render(union_rect, buf);
 
-        // clear background behind text helper thing
-        let clear_background = |area: Rect, buf: &mut Buffer| {
-            for y in area.top()..area.bottom() {
-                for x in area.left()..area.right() {
-                    if let Some(cell) = buf.cell_mut(Position::new(x, y)) {
-                        cell.set_bg(Color::Reset);
-                    }
-                }
-            }
-        };
-
         // draw title
-        clear_background(title_rect, buf);
         let title_paragraph = Paragraph::new(Text::from(title_text.join("\n")))
             .alignment(Alignment::Left)
             .style(Style::default().fg(Color::White).bold());
         title_paragraph.render(title_rect, buf);
 
         // draw menu
-        clear_background(menu_rect, buf);
         let menu_paragraph = Paragraph::new(options).alignment(Alignment::Left);
         menu_paragraph.render(menu_rect, buf);
     }
