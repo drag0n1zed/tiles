@@ -2,11 +2,11 @@ use ratatui::{
     Frame,
     buffer::Buffer,
     crossterm::event::{Event, KeyCode},
-    layout::{Alignment, Position, Rect},
+    layout::{Alignment, Margin, Position, Rect},
     style::{Color, Style},
     symbols::border,
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Paragraph, Widget},
+    widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 
 use crate::screens::{Screen, ScreenAction};
@@ -62,21 +62,14 @@ impl Widget for &MenuScreen {
         let block = Block::bordered().border_set(border::THICK);
         let rect = block.inner(rect);
 
-        // Border
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::White));
-        let inner_area = block.inner(rect);
-        block.render(rect, buf);
-
         // Dither
-        let width = inner_area.width;
+        let width = rect.width;
         let dither_width = (width as f32 * 0.60) as u16;
         let gradient_area = Rect {
-            x: inner_area.right().saturating_sub(dither_width),
-            y: inner_area.y,
+            x: rect.right().saturating_sub(dither_width),
+            y: rect.y,
             width: dither_width,
-            height: inner_area.height,
+            height: rect.height,
         };
 
         let get_noise = |vx: u16, vy: u16, width: f32, left_offset: u16| -> bool {
@@ -115,18 +108,11 @@ impl Widget for &MenuScreen {
             }
         }
 
-        let half_phi = 0.191; // half of golden ratio
-        let one_minus_half_phi = 0.809; // one minus half of golden ratio
-
-        let center_x = inner_area.x + (inner_area.width as f32 * half_phi) as u16;
-        let menu_center_y = inner_area.y + (inner_area.height as f32 * one_minus_half_phi) as u16;
-
         let title_text = vec![
-            "████████ ██████  ██      ██████  ██████",
-            "   ██      ██    ██      ██      ██    ",
-            "   ██      ██    ██      █████   ██████",
-            "   ██      ██    ██      ██          ██",
-            "   ██    ██████  ██████  ██████  ██████",
+            "▀▀██▀▀ ▀▀██▀▀ ▀██▀   ▀██▀▀▀ ▄█▀▀█▄",
+            "  ██     ██    ██     ██▄▄  ██▄▄  ",
+            "  ██     ██    ██     ██▀▀    ▀▀██",
+            " ▗██▖  ▄▄██▄▄ ▄██▄▄█ ▄██▄▄▄ ▀█▄▄█▀",
         ];
         let options = vec![
             Line::from(vec![
@@ -150,24 +136,30 @@ impl Widget for &MenuScreen {
         let t_height = title_text.len() as u16;
         let t_width = title_text[0].chars().count() as u16;
         let m_height = options.len() as u16;
-        let m_width = 20;
+        let m_width = 16;
 
-        // menu
-        let menu_area = Rect {
-            x: center_x.saturating_sub(m_width / 2),
-            y: menu_center_y.saturating_sub(m_height / 2),
+        let menu_rect = Rect {
+            x: rect.x.saturating_add((rect.width as f64 * 0.0625) as u16),
+            y: rect
+                .bottom()
+                .saturating_sub(m_height)
+                .saturating_sub((rect.height as f64 * 0.1) as u16),
             width: m_width,
             height: m_height,
         };
 
-        // title above menu
-        let padding = 3;
-        let title_area = Rect {
-            x: menu_area.x.saturating_sub(1),
-            y: menu_area.y.saturating_sub(t_height + padding),
+        let title_rect = Rect {
+            x: menu_rect.x,
+            y: menu_rect
+                .y
+                .saturating_sub(t_height)
+                .saturating_sub(((rect.height as f64 * 0.04) as u16).max(1)),
             width: t_width,
             height: t_height,
         };
+        let union_rect = menu_rect.union(title_rect).outer(Margin::new(3, 2)).intersection(rect);
+        Clear.render(union_rect, buf);
+        Block::bordered().border_set(border::PLAIN).render(union_rect, buf);
 
         // clear background behind text helper thing
         let clear_background = |area: Rect, buf: &mut Buffer| {
@@ -181,15 +173,15 @@ impl Widget for &MenuScreen {
         };
 
         // draw title
-        clear_background(title_area, buf);
+        clear_background(title_rect, buf);
         let title_paragraph = Paragraph::new(Text::from(title_text.join("\n")))
             .alignment(Alignment::Left)
             .style(Style::default().fg(Color::White).bold());
-        title_paragraph.render(title_area, buf);
+        title_paragraph.render(title_rect, buf);
 
         // draw menu
-        clear_background(menu_area, buf);
+        clear_background(menu_rect, buf);
         let menu_paragraph = Paragraph::new(options).alignment(Alignment::Left);
-        menu_paragraph.render(menu_area, buf);
+        menu_paragraph.render(menu_rect, buf);
     }
 }
