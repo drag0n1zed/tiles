@@ -61,7 +61,7 @@ impl App {
             }
 
             if let Some(screen) = self.screen_stack.last_mut() {
-                let action = screen.update(input);
+                let action = screen.update(input)?;
                 self.handle_action(action);
             }
         }

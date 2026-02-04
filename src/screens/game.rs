@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use color_eyre::eyre::Result;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 use ratatui::symbols::border;
@@ -28,7 +29,7 @@ impl GameScreen {
 }
 
 impl Screen for GameScreen {
-    fn update(&mut self, event: Option<KeyEvent>) -> ScreenAction {
+    fn update(&mut self, event: Option<KeyEvent>) -> Result<ScreenAction> {
         if let Some(key) = event {
             if self.input_queue.len() <= 2 {
                 let input = match key.code {
@@ -51,7 +52,7 @@ impl Screen for GameScreen {
         }
         // TODO: Return ChangeState if all cleared. "Success!"
 
-        ScreenAction::Nothing
+        Ok(ScreenAction::Nothing)
     }
 
     fn render_screen(&self, frame: &mut Frame) {

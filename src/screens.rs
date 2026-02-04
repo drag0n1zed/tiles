@@ -2,6 +2,7 @@ pub mod file_picker;
 pub mod game;
 pub mod menu;
 
+use color_eyre::eyre::Result;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::prelude::*;
 
@@ -20,6 +21,6 @@ impl<T: Screen + 'static> From<T> for ScreenAction {
 }
 
 pub trait Screen {
-    fn update(&mut self, key: Option<KeyEvent>) -> ScreenAction;
+    fn update(&mut self, key: Option<KeyEvent>) -> Result<ScreenAction>;
     fn render_screen(&self, frame: &mut Frame);
 }

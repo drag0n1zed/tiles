@@ -1,5 +1,6 @@
 use std::fs;
 
+use color_eyre::eyre::Result;
 use ratatui::{
     Frame,
     buffer::Buffer,
@@ -13,7 +14,7 @@ use ratatui::{
 
 use crate::{
     game::logic::grid::Grid,
-    screens::{Screen, ScreenAction, game::GameScreen},
+    screens::{Screen, ScreenAction, file_picker::FilePickerScreen, game::GameScreen},
 };
 
 pub struct MenuOption<'a> {
@@ -66,10 +67,7 @@ impl<'a> MenuScreen<'a> {
         Self::new(vec![
             MenuOption {
                 display: Line::raw("Open local game"),
-                action: Box::new(|| {
-                    // Start up file selection thing
-                    ScreenAction::Nothing
-                }),
+                action: Box::new(|| FilePickerScreen::new().into()),
             },
             MenuOption {
                 display: Line::raw("Recent games"),
@@ -87,11 +85,7 @@ impl<'a> MenuScreen<'a> {
 }
 
 impl Screen for MenuScreen<'_> {
-    fn render_screen(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.area());
-    }
-
-    fn update(&mut self, event: Option<KeyEvent>) -> ScreenAction {
+    fn update(&mut self, event: Option<KeyEvent>) -> Result<ScreenAction> {
         if let Some(key) = event {
             match key.code {
                 KeyCode::Up => {
@@ -108,32 +102,36 @@ impl Screen for MenuScreen<'_> {
                         self.selected_index = 0;
                     }
                 }
-                KeyCode::Enter => return (self.options[self.selected_index].action)(),
+                KeyCode::Enter | KeyCode::Right => return Ok((self.options[self.selected_index].action)()),
+                KeyCode::Left => return Ok(ScreenAction::PopScreen),
                 _ => {}
             }
         }
-        ScreenAction::Nothing
+        Ok(ScreenAction::Nothing)
+    }
+    fn render_screen(&self, frame: &mut Frame) {
+        frame.render_widget(self, frame.area());
     }
 }
 
 impl Widget for &MenuScreen<'_> {
     fn render(self, rect: Rect, buf: &mut Buffer) {
-        let block = Block::bordered().border_set(border::THICK);
-        let rect = block.inner(rect);
-
         // Dither
         let width = rect.width;
-        let dither_width = (width as f32 * 0.70) as u16;
         let gradient_area = Rect {
-            x: rect.right().saturating_sub(dither_width),
+            x: rect.right().saturating_sub(width),
             y: rect.y,
-            width: dither_width,
+            width: width,
             height: rect.height,
         };
 
         let get_noise = |vx: u16, vy: u16, width: f32, left_offset: u16| -> bool {
             let relative_x = (vx.saturating_sub(left_offset)) as f32;
             let ratio = relative_x / width;
+
+            let k: f32 = 3.5;
+            let threshold = (f32::exp(k * ratio) - 1.0) / (f32::exp(k) - 1.0);
+
             let seed = (vx as u32).wrapping_mul(0x1E35A7BD) ^ (vy as u32).wrapping_mul(0x10E1);
             let mut hash = seed;
             hash = (hash ^ 61) ^ (hash >> 16);
@@ -141,8 +139,9 @@ impl Widget for &MenuScreen<'_> {
             hash = hash ^ (hash >> 4);
             hash = hash.wrapping_mul(0x27d4eb2d);
             hash = hash ^ (hash >> 15);
+
             let noise_val = (hash % 100) as f32 / 100.0;
-            noise_val < ratio.powf(1.5)
+            noise_val < threshold * 0.9
         };
 
         let g_width = gradient_area.width as f32;
@@ -202,7 +201,7 @@ impl Widget for &MenuScreen<'_> {
         };
         let union_rect = menu_rect.union(title_rect).outer(Margin::new(3, 2)).intersection(rect);
         Clear.render(union_rect, buf);
-        Block::bordered().border_set(border::PLAIN).render(union_rect, buf);
+        Block::bordered().border_set(border::THICK).render(union_rect, buf);
 
         // draw title
         let title_paragraph = Paragraph::new(Text::from(title.join("\n")))
@@ -221,9 +220,9 @@ impl Widget for &MenuScreen<'_> {
 
                 if is_selected {
                     // ARROW
-                    spans.push(Span::styled("> ", Style::default().fg(Color::Yellow)));
+                    spans.push(Span::styled("> ", Style::default()));
                     for span in &option.display.spans {
-                        spans.push(span.clone().fg(Color::Yellow));
+                        spans.push(span.clone().fg(Color::Blue));
                     }
                 } else {
                     // NO ARROW
