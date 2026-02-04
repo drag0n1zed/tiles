@@ -9,7 +9,7 @@ use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{DefaultTerminal, crossterm::event::Event};
 
 use crate::{
-    screens::{Screen, ScreenAction, menu_screen::MenuScreen},
+    screens::{Screen, ScreenAction, menu::MenuScreen},
     timer::Timer,
 };
 
@@ -30,7 +30,7 @@ struct App {
 impl App {
     fn new() -> Self {
         Self {
-            current_screen: Box::new(MenuScreen::new()),
+            current_screen: Box::new(MenuScreen::default()),
             tick_timer: Timer::new(Duration::from_secs_f64(1.0 / 120.0)), // 120 TPS/FPS
             exit: false,
         }

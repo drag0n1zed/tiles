@@ -1,5 +1,5 @@
-pub mod game_screen;
-pub mod menu_screen;
+pub mod game;
+pub mod menu;
 
 use ratatui::crossterm::event::Event;
 use ratatui::prelude::*;
