@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use ratatui::crossterm::event::{Event, KeyCode};
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 use ratatui::symbols::border;
 use ratatui::widgets::Block;
@@ -28,24 +28,20 @@ impl GameScreen {
 }
 
 impl Screen for GameScreen {
-    fn handle_input(&mut self, event: Event) -> ScreenAction {
-        let Event::Key(key) = event else {
-            return ScreenAction::Nothing;
-        };
-        if self.input_queue.len() <= 2 {
-            let input: Option<MoveDir> = match (key.code, key.modifiers) {
-                (KeyCode::Left, _) => Some(MoveDir::Left),
-                (KeyCode::Right, _) => Some(MoveDir::Right),
-                (KeyCode::Up, _) => Some(MoveDir::Up),
-                (KeyCode::Down, _) => Some(MoveDir::Down),
-                _ => None,
+    fn update(&mut self, event: Option<KeyEvent>) -> ScreenAction {
+        if let Some(key) = event {
+            if self.input_queue.len() <= 2 {
+                let input = match key.code {
+                    KeyCode::Left => Some(MoveDir::Left),
+                    KeyCode::Right => Some(MoveDir::Right),
+                    KeyCode::Up => Some(MoveDir::Up),
+                    KeyCode::Down => Some(MoveDir::Down),
+                    _ => None,
+                };
+                self.input_queue.extend(input);
             };
-            self.input_queue.extend(input);
-        };
-        ScreenAction::Nothing
-    }
+        }
 
-    fn update(&mut self) -> ScreenAction {
         self.grid.update_anim_state();
 
         if self.grid.is_anim_completed()

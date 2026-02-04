@@ -4,14 +4,13 @@ mod timer;
 
 use std::time::Duration;
 
-use color_eyre::eyre::Result;
-use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{DefaultTerminal, crossterm::event::Event};
-
 use crate::{
     screens::{Screen, ScreenAction, menu::MenuScreen},
     timer::Timer,
 };
+use color_eyre::eyre::Result;
+use ratatui::crossterm::event::{self, KeyCode, KeyModifiers};
+use ratatui::{DefaultTerminal, crossterm::event::Event};
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -22,51 +21,59 @@ fn main() -> Result<()> {
 }
 
 struct App {
-    current_screen: Box<dyn Screen>,
+    screen_stack: Vec<Box<dyn Screen>>,
     tick_timer: Timer,
-    exit: bool,
 }
 
 impl App {
     fn new() -> Self {
         Self {
-            current_screen: Box::new(MenuScreen::default()),
+            screen_stack: vec![Box::new(MenuScreen::main_menu())],
             tick_timer: Timer::new(Duration::from_secs_f64(1.0 / 120.0)), // 120 TPS/FPS
-            exit: false,
         }
     }
 
     fn run(mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         terminal.clear()?;
 
-        while !self.exit {
-            terminal.draw(|frame| self.current_screen.render_screen(frame))?;
+        loop {
+            if let Some(screen) = self.screen_stack.last() {
+                terminal.draw(|frame| screen.render_screen(frame))?;
+            } else {
+                break;
+            }
+
+            let mut input = None;
 
             if event::poll(self.tick_timer.time_until_ready())? {
                 while event::poll(Duration::ZERO)? {
-                    let event = event::read()?;
-                    if let Event::Key(KeyEvent { code, modifiers, .. }) = event {
-                        match (code, modifiers) {
-                            (KeyCode::Esc, _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                                self.exit = true;
+                    if let Event::Key(key) = event::read()? {
+                        match (key.modifiers, key.code) {
+                            (KeyModifiers::CONTROL, KeyCode::Char('c')) => self.screen_stack.clear(),
+                            (_, KeyCode::Esc) => {
+                                self.screen_stack.pop();
                             }
                             _ => {}
                         }
-                    }
-                    let action = self.current_screen.handle_input(event);
-                    self.handle_action(action);
+                        input = Some(key);
+                    };
                 }
             }
 
-            let action = self.current_screen.update();
-            self.handle_action(action);
+            if let Some(screen) = self.screen_stack.last_mut() {
+                let action = screen.update(input);
+                self.handle_action(action);
+            }
         }
         Ok(())
     }
 
     fn handle_action(&mut self, action: ScreenAction) {
         match action {
-            ScreenAction::ChangeScreen(screen) => self.current_screen = screen,
+            ScreenAction::PushScreen(screen) => self.screen_stack.push(screen),
+            ScreenAction::PopScreen => {
+                self.screen_stack.pop();
+            }
             _ => {}
         }
     }

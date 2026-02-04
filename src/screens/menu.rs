@@ -3,7 +3,7 @@ use std::fs;
 use ratatui::{
     Frame,
     buffer::Buffer,
-    crossterm::event::{Event, KeyCode},
+    crossterm::event::{KeyCode, KeyEvent},
     layout::{Alignment, Margin, Position, Rect},
     style::{Color, Style, Stylize},
     symbols::border,
@@ -34,8 +34,8 @@ impl<'a> MenuScreen<'a> {
         }
     }
 
-    pub fn default() -> Self {
-        let options = vec![
+    pub fn main_menu() -> Self {
+        Self::new(vec![
             MenuOption {
                 display: Line::raw("Begin Challenge"),
                 action: Box::new(|| {
@@ -48,75 +48,70 @@ impl<'a> MenuScreen<'a> {
                 action: Box::new(|| {
                     // TODO: resume last played game
                     let grid = Grid::from_ron(fs::read_to_string("grid.ron").unwrap().as_str()).unwrap();
-                    ScreenAction::ChangeScreen(Box::new(GameScreen::from_grid(grid)))
+                    GameScreen::from_grid(grid).into()
                 }),
             },
             MenuOption {
                 display: Line::raw("Custom"),
+                action: Box::new(|| MenuScreen::custom_menu().into()),
+            },
+            MenuOption {
+                display: Line::raw("Quit"),
+                action: Box::new(|| ScreenAction::PopScreen),
+            },
+        ])
+    }
+
+    pub fn custom_menu() -> Self {
+        Self::new(vec![
+            MenuOption {
+                display: Line::raw("Open local game"),
                 action: Box::new(|| {
-                    // TODO: Custom Mode
-                    let custom_options = vec![
-                        MenuOption {
-                            display: Line::raw("Open local game"),
-                            action: Box::new(|| {
-                                // Start up file selection thing
-                                ScreenAction::Nothing
-                            }),
-                        },
-                        MenuOption {
-                            display: Line::raw("Recent games"),
-                            action: Box::new(|| {
-                                // give a list of recently opened games
-                                ScreenAction::Nothing
-                            }),
-                        },
-                        MenuOption {
-                            display: Line::raw("Back"),
-                            action: Box::new(|| ScreenAction::ChangeScreen(Box::new(MenuScreen::default()))),
-                        },
-                    ];
-                    ScreenAction::ChangeScreen(Box::new(MenuScreen::new(custom_options)))
+                    // Start up file selection thing
+                    ScreenAction::Nothing
                 }),
             },
-        ];
-
-        MenuScreen::new(options)
+            MenuOption {
+                display: Line::raw("Recent games"),
+                action: Box::new(|| {
+                    // give a list of recently opened games
+                    ScreenAction::Nothing
+                }),
+            },
+            MenuOption {
+                display: Line::raw("Back"),
+                action: Box::new(|| ScreenAction::PopScreen),
+            },
+        ])
     }
 }
 
 impl Screen for MenuScreen<'_> {
-    fn handle_input(&mut self, event: Event) -> ScreenAction {
-        let Event::Key(key) = event else {
-            return ScreenAction::Nothing;
-        };
-
-        match key.code {
-            KeyCode::Up => {
-                if self.selected_index > 0 {
-                    self.selected_index -= 1;
-                } else {
-                    self.selected_index = self.options.len() - 1;
-                }
-                ScreenAction::Nothing
-            }
-            KeyCode::Down => {
-                if self.selected_index < self.options.len() - 1 {
-                    self.selected_index += 1;
-                } else {
-                    self.selected_index = 0;
-                }
-                ScreenAction::Nothing
-            }
-            KeyCode::Enter => (self.options[self.selected_index].action)(),
-            _ => ScreenAction::Nothing,
-        }
-    }
-
     fn render_screen(&self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
     }
 
-    fn update(&mut self) -> ScreenAction {
+    fn update(&mut self, event: Option<KeyEvent>) -> ScreenAction {
+        if let Some(key) = event {
+            match key.code {
+                KeyCode::Up => {
+                    if self.selected_index > 0 {
+                        self.selected_index -= 1;
+                    } else {
+                        self.selected_index = self.options.len() - 1;
+                    }
+                }
+                KeyCode::Down => {
+                    if self.selected_index < self.options.len() - 1 {
+                        self.selected_index += 1;
+                    } else {
+                        self.selected_index = 0;
+                    }
+                }
+                KeyCode::Enter => return (self.options[self.selected_index].action)(),
+                _ => {}
+            }
+        }
         ScreenAction::Nothing
     }
 }

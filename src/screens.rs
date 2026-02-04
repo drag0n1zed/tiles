@@ -1,18 +1,25 @@
+pub mod file_picker;
 pub mod game;
 pub mod menu;
 
-use ratatui::crossterm::event::Event;
+use ratatui::crossterm::event::KeyEvent;
 use ratatui::prelude::*;
 
 #[derive(Default)]
 pub enum ScreenAction {
     #[default]
     Nothing,
-    ChangeScreen(Box<dyn Screen>),
+    PushScreen(Box<dyn Screen>),
+    PopScreen,
+}
+
+impl<T: Screen + 'static> From<T> for ScreenAction {
+    fn from(screen: T) -> Self {
+        ScreenAction::PushScreen(Box::new(screen))
+    }
 }
 
 pub trait Screen {
-    fn handle_input(&mut self, event: Event) -> ScreenAction;
-    fn update(&mut self) -> ScreenAction;
+    fn update(&mut self, key: Option<KeyEvent>) -> ScreenAction;
     fn render_screen(&self, frame: &mut Frame);
 }
